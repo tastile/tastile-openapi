@@ -1,0 +1,22 @@
+# Editor / IDE noise
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Generated
+*.bak
+*.tmp
+*.orig
+*.rej
+
+# Python (if any tooling uses it)
+__pycache__/
+*.pyc
+.venv/

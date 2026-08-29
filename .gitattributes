@@ -1,0 +1,8 @@
+# Normalize line endings to LF for spec files.
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Disable linguist for generated YAML (avoid language stats skew).
+openapi.yaml linguist-generated=true
