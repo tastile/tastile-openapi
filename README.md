@@ -1,4 +1,4 @@
-# tastile-openapi-spec
+# tastile-openapi
 
 Canonical OpenAPI 3.1 specification for the **Tastile v1 API**.
 
