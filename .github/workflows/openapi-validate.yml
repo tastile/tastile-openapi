@@ -1,0 +1,37 @@
+name: openapi-validate
+
+# Validate openapi.yaml against OpenAPI 3.1 schema using redocly/cli.
+#
+# Policy §24 (action pinning): redocly/cli is pulled as a Docker image,
+# which is content-addressed by tag (the Docker equivalent of a SHA pin
+# for first-party actions like actions/checkout). The JS actions below
+# use major-version tags as a placeholder; production repos should
+# promote them to full commit SHAs via Renovate / Dependabot.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# One in-flight run per ref; PRs keep a single sequential history.
+concurrency:
+  group: openapi-validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+# Default-deny. This job only needs read access to the repo contents.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: redocly lint openapi.yaml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: redocly lint (OpenAPI 3.1)
+        uses: docker://redocly/cli:1.25.5
+        with:
+          args: lint openapi.yaml

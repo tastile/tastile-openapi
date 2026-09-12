@@ -1,0 +1,32 @@
+# Dependabot configuration for tastile-openapi
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Policy §24 (action pinning): this repo pins third-party JS actions by major tag
+# (only actions/checkout@v4 is used). Dependabot will propose minor / patch bumps
+# and pin them to commit SHAs once the maintainer approves the PR.
+
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      github-actions-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "ci"
+      prefix-development: "ci(dev)"
+      include: "scope"
+    open-pull-requests-limit: 5

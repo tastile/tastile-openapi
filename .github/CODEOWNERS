@@ -1,0 +1,7 @@
+# CODEOWNERS — tastile-openapi
+# Gate all PRs on a single owner to prevent drift from the regeneration
+# contract. `openapi.yaml` is regenerated from tastile-core; hand-edits
+# are forbidden by README §"Regenerating openapi.yaml".
+
+*       @rebuildup
+/openapi.yaml   @rebuildup
