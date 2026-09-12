@@ -6,8 +6,9 @@ wire format is a MAJOR bump.
 
 ## v1.0.0 — 2026-09-12
 
-- Release candidate contract for the 2026-09-19 free release (C07;
-  freeze pending core #132 merge + final regen from the integrated SHA).
+- Release frozen contract for the 2026-09-19 free release (C07;
+  core #132 merged, final regen from the integrated SHA verified
+  zero-diff).
 - 19 paths, 133 component schemas.
 - Generated from `tastile-core`'s `dump_openapi` binary
   (`crates-v1/api/src/bin/dump_openapi.rs`) at core
