@@ -6,14 +6,15 @@ wire format is a MAJOR bump.
 
 ## v1.0.0 — 2026-09-12
 
-- Release candidate contract for the 2026-09-19 free release (C07;
-  freeze pending core #132 merge + final regen from the integrated SHA).
+- Release frozen contract for the 2026-09-19 free release (C07;
+  core #132 merged, final regen from the integrated SHA verified
+  zero-diff).
 - 19 paths, 133 component schemas.
 - Generated from `tastile-core`'s `dump_openapi` binary
-  (`crates-v1/api/src/bin/dump_openapi.rs`) at core branch `122`
-  `8e7f53e8d2a6f931fa31541c792268c4ba98fdb9`
-  (PR #132, review fixes for signout/kind/export docs; base is
-  `release-0-6-0` `7fce98f`). Final regen + SHA sync follows the merge.
+  (`crates-v1/api/src/bin/dump_openapi.rs`) at core
+  `release-0-6-0` `3fa63fa59afd4cabcf2a5dca2fddbe1bb2e79539`
+  (Merge PR #132, review fixes + C04F snapshot-key fix; spec output
+  verified zero-diff against this revision).
 - Added (backward-compatible):
   - `POST /v1/auth/signout` (credential revoke, idempotent 204 only).
   - `DELETE /v1/owners/{kind}/{id}` + `OwnerDeleteResponseSchema`
