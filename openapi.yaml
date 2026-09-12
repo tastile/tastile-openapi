@@ -1296,29 +1296,6 @@ components:
       - retention_until
       - kept
       type: object
-    OwnerExportResponseSchema:
-      description: 'Response body metadata for `GET /v1/owners/{kind}/{id}/export`
-
-        (ADR-0010 §D-3.2). The binary NDJSON stream is documented via the
-
-        `application/x-ndjson` content-type entry; `format` / `tables` are
-
-        surfaced here so SDKs can prepare their own parsers without parsing
-
-        the stream itself.'
-      properties:
-        format:
-          description: Wire format marker.  Always `"json-lines"` today.
-          type: string
-        tables:
-          description: Table names that the export stream emits, in emission order.
-          items:
-            type: string
-          type: array
-      required:
-      - format
-      - tables
-      type: object
     PendingWorkSchema:
       properties:
         expected_at:
@@ -3215,8 +3192,6 @@ paths:
       responses:
         '204':
           description: Credential revoked (or no credential present; idempotent)
-        '401':
-          description: Missing or invalid auth
       tags:
       - Auth
   /v1/executions/{id}/finish:
@@ -3317,7 +3292,7 @@ paths:
     delete:
       operationId: delete_owner
       parameters:
-      - description: Owner kind (0 USER / 1 WORKSPACE / 2 GROUP / 3 ROLE / 4 ORG)
+      - description: 'Owner kind: 0 (USER) only; 1..4 always returns 404 (unsupported)'
         in: path
         name: kind
         required: true
@@ -3341,7 +3316,7 @@ paths:
         '401':
           description: Missing or invalid auth
         '404':
-          description: Owner not found or not accessible
+          description: Owner not found, not accessible, or unsupported kind (1..4)
       summary: 'Soft-tombstone one owner.  Returns the deletion timestamp and
 
         the retention window.'
@@ -3351,7 +3326,7 @@ paths:
     get:
       operationId: export_owner
       parameters:
-      - description: Owner kind (0 USER / 1 WORKSPACE / 2 GROUP / 3 ROLE / 4 ORG)
+      - description: 'Owner kind: 0 (USER) only; 1..4 always returns 404 (unsupported)'
         in: path
         name: kind
         required: true
@@ -3371,11 +3346,11 @@ paths:
             application/x-ndjson:
               schema:
                 type: string
-          description: 'NDJSON body: one table-name + JSON row per line'
+          description: 'NDJSON body: one JSON object per line, each { table, row }'
         '401':
           description: Missing or invalid auth
         '404':
-          description: Owner not found or not accessible
+          description: Owner not found, not accessible, or unsupported kind (1..4)
       summary: 'Stream all owner rows as NDJSON (`application/x-ndjson`).
 
         Permitted for tombstoned owners too (GDPR Art.20 portability).'
