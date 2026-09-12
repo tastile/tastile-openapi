@@ -4,9 +4,32 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
-## Unreleased
+## v1.0.0 — 2026-09-12
 
-- None yet.
+- Release candidate contract for the 2026-09-19 free release (C07;
+  freeze pending core #132 merge + final regen from the integrated SHA).
+- 19 paths, 133 component schemas.
+- Generated from `tastile-core`'s `dump_openapi` binary
+  (`crates-v1/api/src/bin/dump_openapi.rs`) at core branch `122`
+  `8e7f53e8d2a6f931fa31541c792268c4ba98fdb9`
+  (PR #132, review fixes for signout/kind/export docs; base is
+  `release-0-6-0` `7fce98f`). Final regen + SHA sync follows the merge.
+- Added (backward-compatible):
+  - `POST /v1/auth/signout` (credential revoke, idempotent 204 only).
+  - `DELETE /v1/owners/{kind}/{id}` + `OwnerDeleteResponseSchema`
+    (logical delete, 30-day retention; `kind = 0` only, `1..4` → 404).
+  - `GET /v1/owners/{kind}/{id}/export` (`application/x-ndjson`,
+    one `{ table, row }` object per line; `kind = 0` only).
+    No metadata component by design — the operation documents the
+    line contract inline.
+  - `ApiTokenCreateRequestSchema` (`POST /v1/api-tokens`, explicit
+    `expires_at` per ADR-0010 §D-1.1).
+- Removed (dead endpoints, routes no longer in the router; MAJOR bump
+  per this repo's versioning rule):
+  - `/v1/executions/{id}/facts`, `/v1/executions/{id}/tasks`,
+    `/v1/plans/{id}/completion-result`, `/v1/sessions/{id}/close`.
+- Kept: `RequestKindSchema::MarkTask` (server-implemented,
+  `decision_runtime_repo`, kind 5).
 
 ## v0.1.0 — 2026-08-29
 
