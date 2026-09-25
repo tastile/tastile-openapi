@@ -1,36 +1,46 @@
 # AGENTS.md — tastile-openapi
 
-> Pointer-only dispatcher. This repository is a **generated artifact**: the
-> canonical OpenAPI 3.1 spec for the Tastile v1 API. The wire-format source
-> of truth lives in `tastile-core` (`crates-v1/api/src/openapi.rs`,
-> `dump_openapi` binary), and the YAML in this repo is regenerated from that
-> source. Do not hand-edit `openapi.yaml`.
+> This repository publishes the canonical OpenAPI 3.1 contract snapshot for Tastile v1. The generator source of truth lives in `tastile-core`; never hand-edit `openapi.yaml`.
 
-## Canonical contract
+## Governance
 
-| Topic | Read first |
-| --- | --- |
-| Workspace policy, invariants, branch workflow | `/home/basic/work/tastile/AGENTS.md` |
-| Project-init (canonical Git remote, release refs, GH Projects) | <https://github.com/rebuildup/project-init/tree/release-0-1-1> |
-| Regeneration contract (how `openapi.yaml` is produced) | This repo's `README.md` § "Regenerating `openapi.yaml`" |
+- Top-level contract: [`constitution/CONSTITUTION.md`](constitution/CONSTITUTION.md)
+- Current Operating Model: [`organization/profiles/release-driven-solo.md`](organization/profiles/release-driven-solo.md)
+- Regeneration contract: [`README.md`](README.md)
+- project-init governance baseline: `rebuildup/project-init@release-0-3-0`
+- project-init managed Skills source: current `rebuildup/project-init` via `bunx skills`
 
-All durable ticket workflow (`release-<major>-<minor>-<patch>` sprint
-branches per ADR-0007, GitHub Issue-numbered ticket branches, mandatory
-Draft PRs), recovery policy (ADR-0008), orchestration / worker lease
-fencing, and external side-effect journals live in the parent repository.
-Do not duplicate them here.
+## Canonical boundaries
 
-## Branch workflow (pointer)
+- Rust/utoipa generation source: `tastile-core/crates-v1/api/src/openapi.rs`.
+- `openapi.yaml`: generated distributed contract snapshot; never hand-edit.
+- this repository: contract version/history and published Git identity.
+- `tastile-root`: workspace submodule pointer identity.
+- web/android/desktop generated clients: downstream consumer artifacts, not sources of truth.
 
-- `main` — released / integrated state.
-- `release-<major>-<minor>-<patch>` — active sprint branch (per ADR-0007).
-- Ticket branches are named by GitHub Issue number only (no `feature/*` /
-  `fix-*` slug prefix).
-- Legacy note: the historic `publish-v1.0.0` branch was the pre-ADR-0007
-  publishing lane; it is retained for archaeology but must not be
-  force-renamed to match the new pattern.
+A valid contract update must preserve the derivation chain:
 
-## Source-language rule (§28)
+`core source SHA -> generated contract -> openapi repo SHA/tag -> root submodule pointer -> consumer regeneration evidence`.
 
-- Source code, identifiers, code comments, commit messages: **English**.
-- GitHub Issues, PR descriptions, internal review comments: **Japanese**.
+## Branch / release workflow
+
+- `main`: released / integrated state.
+- `release-x-y-z`: active release integration line.
+- ticket branch: GitHub Issue number only.
+- ticket PRs target the active release branch.
+- normal integration into `main` comes only from the release PR.
+- landing method: merge commit only.
+- historic branch names remain archaeology; do not rewrite them just to match the current model.
+
+## Agent Skills
+
+- bootstrap: `mise run skills-bootstrap`
+- update: `mise run skills-update`
+- canonical managed layout: `.agents/skills/` + `.claude/skills/`
+- `skills-lock.json` is project-local source/content freshness metadata.
+- `skills install` is not the sole fresh-clone path because current restore is universal-path-only.
+
+## Language
+
+- source/config/commit messages: English.
+- Issues / PR descriptions / internal review / governance docs: Japanese.
