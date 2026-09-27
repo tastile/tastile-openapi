@@ -4,6 +4,34 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v1.0.1 — 2026-09-27
+
+- Issue #153 wire contract refresh for the 2026-09-27 production release
+  train (Core 1.0.1, Web 1.0.2, CLI 1.0.0).
+- 19 paths, 133 component schemas (path / schema count unchanged from
+  v1.0.0; 153 work in Core is internal — `AuthContext`, `ScopeSet`,
+  central `require()` middleware — not exposed as new endpoints on the
+  Core surface).
+- Generated from `tastile-core`'s `dump_openapi` binary
+  (`crates-v1/api/src/bin/dump_openapi.rs`) at core `release-1-0-1`
+  `8beacd06497ee81e49cdb5f1a0ca0eaf4fb410cd` (3 cherry-picked 153
+  commits: `30ab141` granular API-token scope + AuthContext central
+  pattern, `f729831` complete central `require()` pattern across
+  handler inventory, `8beacd0` `Scope::All` acts as wildcard +
+  parse rejects empty input).
+- Added (backward-compatible):
+  - `ScopeSchema` (`tastile.read` | `tastile.write` | `tastile.all` —
+    enum-style three-state scope type surfaced to clients that mint
+    API tokens via the new granular path).
+  - `x-tastile-required-scope` extension attribute on existing
+    endpoint operations (e.g. `signout`: `none`). Lets clients and
+    Code generators enforce per-route scope checks without parsing
+    prose descriptions.
+- Note: Web-side `/cli/authorize` and `/api/cli/token` (the PKCE flow
+  for tastile-cli) live in `tastile-web`, not Core, and are not part
+  of this spec. Their wire contract is documented in
+  `docs/cli/issue-153.md` of `tastile-web`.
+
 ## v1.0.0 — 2026-09-12
 
 - Release frozen contract for the 2026-09-19 free release (C07;
