@@ -31,3 +31,5 @@ node_modules/
 # Local validator scratch (redocly, spectral, etc.)
 .openapi-cache/
 .openapi-cli/
+# Build agent artifacts (per release-1.0.1 sync)
+.claude/logs/
