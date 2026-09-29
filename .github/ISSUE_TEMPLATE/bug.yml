@@ -1,0 +1,71 @@
+name: Bug Report
+description: openapi.yaml 不整合、schema / path の欠落、consumer (tastile-core / tastile-web / tastile-android) 側の型生成エラーなどを報告する。
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 必須 field (ADR-0009 §D-4)
+
+        着手前に Project v2 で `priority / size / target_release` を埋める。
+
+  - type: input
+    id: target_release
+    attributes:
+      label: target_release
+      description: 修正を ship したい release (例: v1.0.1)。未定なら空欄。
+      placeholder: "v1.0.1"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: priority
+      description: ADR-0009 の優先度。P0 は wire-format 破壊的 regression、P1 は consumer block、P2 は cosmetic。
+      options:
+        - "P0"
+        - "P1"
+        - "P2"
+        - "P3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: size
+      description: 想定工数。S は 1 日以内、M は 1 週間以内、L は sprint 跨ぎ。
+      options:
+        - "S"
+        - "M"
+        - "L"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: area
+    attributes:
+      label: area (複数選択可)
+      description: 該当領域を選択。
+      options:
+        - label: "spec — openapi.yaml の path / schema / 例"
+        - label: "regen — tastile-core の dump_openapi / utoipa 由来"
+        - label: "docs — README / CHANGELOG"
+        - label: "ci — workflow / validate"
+        - label: "other"
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: 何が壊れているか、再現条件、期待動作を 1〜3 行で。
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 再現手順
+      description: 該当 commit / 該当 consumer / 該当 endpoint を明記。
