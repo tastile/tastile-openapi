@@ -1,166 +1,940 @@
+openapi: 3.1.0
+info:
+  title: api
+  description: v1 API binary per docs/v1/14. Old v0/tastile-api MUST NOT be imported here.
+  contact:
+    name: 361do_sleep
+    email: rebuild.up.up@gmail.com
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+  version: 1.0.1
+paths:
+  /v1/auth/signout:
+    post:
+      tags:
+      - Auth
+      operationId: signout
+      responses:
+        '204':
+          description: Credential revoked (or no credential present; idempotent)
+      x-tastile-required-scope: none
+  /v1/executions/{id}/finish:
+    post:
+      tags:
+      - Execution
+      operationId: finish_execution
+      parameters:
+      - name: id
+        in: path
+        description: Execution id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinishExecutionRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Execution not found or not accessible
+      x-tastile-required-scope: tastile.write
+  /v1/executions/{id}/pause:
+    post:
+      tags:
+      - Execution
+      operationId: pause_execution
+      parameters:
+      - name: id
+        in: path
+        description: Execution id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionLifecycleRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Execution not found or not accessible
+        '409':
+          description: Execution is not in a pausable state
+      x-tastile-required-scope: tastile.write
+  /v1/executions/{id}/resume:
+    post:
+      tags:
+      - Execution
+      operationId: resume_execution
+      parameters:
+      - name: id
+        in: path
+        description: Execution id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionLifecycleRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Execution not found or not accessible
+        '409':
+          description: Execution is not in a resumable state
+      x-tastile-required-scope: tastile.write
+  /v1/owners/{kind}/{id}:
+    delete:
+      tags:
+      - Owner
+      summary: 'Soft-tombstone one owner.  Returns the deletion timestamp and
+
+        the retention window.'
+      operationId: delete_owner
+      parameters:
+      - name: kind
+        in: path
+        description: 'Owner kind: 0 (USER) only; 1..4 always returns 404 (unsupported)'
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: id
+        in: path
+        description: Owner id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Owner tombstoned (or already tombstoned; idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerDeleteResponseSchema'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Owner not found, not accessible, or unsupported kind (1..4)
+      x-tastile-required-scope: OwnerAdmin
+  /v1/owners/{kind}/{id}/export:
+    get:
+      tags:
+      - Owner
+      summary: 'Stream all owner rows as NDJSON (`application/x-ndjson`).
+
+        Permitted for tombstoned owners too (GDPR Art.20 portability).'
+      operationId: export_owner
+      parameters:
+      - name: kind
+        in: path
+        description: 'Owner kind: 0 (USER) only; 1..4 always returns 404 (unsupported)'
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: id
+        in: path
+        description: Owner id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 'NDJSON body: one JSON object per line, each { table, row }'
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Owner not found, not accessible, or unsupported kind (1..4)
+      x-tastile-required-scope: OwnerAdmin
+  /v1/placements/{id}/executions:
+    post:
+      tags:
+      - Execution
+      operationId: start_execution
+      parameters:
+      - name: id
+        in: path
+        description: Placement id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartExecutionRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Path id and payload id do not match
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Placement not found or not accessible
+      x-tastile-required-scope: tastile.write
+  /v1/prompts:
+    post:
+      tags:
+      - Prompt
+      operationId: request_prompt
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPromptRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response; the new id is in aggregateMeta.promptId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (unknown kind, subject mismatch)
+        '401':
+          description: Missing or invalid auth
+      x-tastile-required-scope: tastile.write
+  /v1/prompts/pending:
+    get:
+      tags:
+      - Prompt
+      operationId: list_pending_prompts
+      responses:
+        '200':
+          description: Unresolved, unexpired prompts oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromptView'
+        '401':
+          description: Missing or invalid auth
+      x-tastile-required-scope: tastile.read
+  /v1/prompts/startup-recovery:
+    post:
+      tags:
+      - Prompt
+      operationId: respond_startup_recovery
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartupRecoveryRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Unknown prompt, or owned by someone else
+        '409':
+          description: Prompt is already resolved
+      x-tastile-required-scope: tastile.write
+  /v1/prompts/{prompt_id}/resolve:
+    post:
+      tags:
+      - Prompt
+      operationId: resolve_prompt
+      parameters:
+      - name: prompt_id
+        in: path
+        description: Prompt id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolvePromptRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Unknown prompt, or owned by someone else
+        '409':
+          description: Prompt is already resolved
+      x-tastile-required-scope: tastile.write
+  /v1/schedule-definitions:
+    post:
+      tags:
+      - SourceTile
+      operationId: publish_schedule_definition
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishScheduleDefinitionRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+      x-tastile-required-scope: tastile.write
+  /v1/source-tiles:
+    get:
+      tags:
+      - SourceTile
+      summary: List SourceTiles owned by the authenticated or queried owner.
+      operationId: list_source_tiles
+      parameters:
+      - name: owner_id
+        in: query
+        description: Owner or delegated workspace
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        description: Maximum rows (1..500)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: offset
+        in: query
+        description: Rows to skip
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      responses:
+        '200':
+          description: List of SourceTiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SourceTileRead'
+        '401':
+          description: Missing or invalid auth
+      x-tastile-required-scope: tastile.read
+    post:
+      tags:
+      - SourceTile
+      summary: Create a new SourceTile.  Server owns all aggregate ids.
+      operationId: create_source_tile
+      requestBody:
+        description: SourceTile command envelope
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSourceTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+      x-tastile-required-scope: tastile.write
+  /v1/source-tiles/{id}:
+    get:
+      tags:
+      - SourceTile
+      summary: Read one SourceTile plus its occurrences and placements.
+      operationId: get_source_tile
+      parameters:
+      - name: id
+        in: path
+        description: SourceTile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: owner_id
+        in: query
+        description: Owner or delegated workspace
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        description: Maximum occurrences and placements (1..500)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: offset
+        in: query
+        description: Occurrences and placements to skip
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      responses:
+        '200':
+          description: SourceTile detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceTileDetailRead'
+        '404':
+          description: Not found or not accessible
+      x-tastile-required-scope: tastile.read
+    put:
+      tags:
+      - SourceTile
+      summary: 'Replace the SourceTile schedule, occurrence set, and revision.
+
+        Preserves historical occurrences/placement identity; advances
+
+        the SourceTile revision.'
+      operationId: update_source_tile
+      parameters:
+      - name: id
+        in: path
+        description: SourceTile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: SourceTile update command envelope
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSourceTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '404':
+          description: Not found or not accessible
+      x-tastile-required-scope: tastile.write
+  /v1/source-tiles/{id}/cancel:
+    post:
+      tags:
+      - SourceTile
+      summary: 'Cancel a SourceTile. Transitions the source from ACTIVE to
+
+        CANCELLED, emits a `v1_source_lifecycle_event` row, and closes
+
+        every source-managed (`source.kind = 4`) Placement whose span
+
+        overlaps the source''s effective horizon. Running executions on
+
+        the closed placements finish naturally; new work cannot be
+
+        dispatched against them. Idempotent on retry.'
+      operationId: cancel_source_tile
+      parameters:
+      - name: id
+        in: path
+        description: SourceTile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: SourceTile cancel command envelope
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelSourceTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (e.g. invalid reason)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Not found or not accessible
+        '409':
+          description: Stale revision / already cancelled
+      x-tastile-required-scope: tastile.write
+  /v1/source-tiles/{id}/completion:
+    get:
+      tags:
+      - SourceTile
+      summary: Derive per-segment and whole-occurrence completion for a SourceTile.
+      operationId: get_source_tile_completion
+      parameters:
+      - name: id
+        in: path
+        description: SourceTile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: owner_id
+        in: query
+        description: Owner or delegated workspace
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Derived split completion
+          content:
+            application/json:
+              schema: {}
+        '404':
+          description: Not found or not accessible
+      x-tastile-required-scope: tastile.read
+  /v1/source-tiles/{id}/placements:
+    get:
+      tags:
+      - SourceTile
+      summary: List canonical Placement rows for a SourceTile in owner scope.
+      operationId: list_source_tile_placements
+      parameters:
+      - name: id
+        in: path
+        description: SourceTile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: owner_id
+        in: query
+        description: Owner or delegated workspace
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        description: Maximum rows (1..500)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: offset
+        in: query
+        description: Rows to skip
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      responses:
+        '200':
+          description: Placements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlacementTileRead'
+        '404':
+          description: Not found or not accessible
+      x-tastile-required-scope: tastile.read
+  /v1/source-tiles/{id}/reflow:
+    post:
+      tags:
+      - SourceTile
+      summary: 'Re-evaluate the SourceTile within a window.  Closes affected
+
+        auto-managed future placements and emits replacements without
+
+        touching detached / execution / placement-override rows.'
+      operationId: reflow_source_tile
+      parameters:
+      - name: id
+        in: path
+        description: SourceTile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: SourceTile reflow command envelope
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReflowSourceTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '404':
+          description: Not found or not accessible
+        '422':
+          description: Detached / execution / override protects a placement
+      x-tastile-required-scope: tastile.write
+  /v1/tiles:
+    get:
+      tags:
+      - Read
+      summary: 'List tiles (v1 view-model projection).  Per
+
+        docs/superpowers/plans/2026-07-07-v1-tile-list-view-model.md Task 3
+
+        the handler projects `domain::TileListView` so every Tile parameter is
+
+        reachable through the API surface (v1/14 §9).'
+      operationId: list_tiles
+      parameters:
+      - name: owner_ids
+        in: query
+        description: 'Comma-separated list of owner_ids.  Defaults to the authenticated
+
+          owner (= Personal scope) when omitted.'
+        required: false
+        schema:
+          type: string
+        style: form
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+        style: form
+      - name: view_mode
+        in: query
+        description: 'View bucketing.  `"by_state"` groups tiles by lifecycle.
+
+          Defaults to `"flat"` (no bucketing) for backwards compat with the
+
+          existing TileSummary-only consumers.'
+        required: false
+        schema:
+          type: string
+        style: form
+      - name: lifecycle
+        in: query
+        description: 'Optional lifecycle filter.  One of "ready" | "started" | "done" |
+
+          "closed"; maps to `TileLifecycleKind` numeric constants via
+
+          `parse_view_filters`.'
+        required: false
+        schema:
+          type: string
+        style: form
+      - name: range
+        in: query
+        description: 'Range string for `by_state` projection (e.g. "7d", "30d").  Only
+
+          used when `view_mode = "by_state"`.'
+        required: false
+        schema:
+          type: string
+        style: form
+      - name: granularity
+        in: query
+        description: 'Granularity string for `by_state` projection
+
+          (e.g. "no_breaks,min_0m", "important_only").'
+        required: false
+        schema:
+          type: string
+        style: form
+      - name: search
+        in: query
+        description: Free-text search across title / description / labels.
+        required: false
+        schema:
+          type: string
+        style: form
+      - name: exclude_future
+        in: query
+        description: 'When true, exclude tiles whose first upcoming placement is
+
+          strictly after the current instant.'
+        required: false
+        schema:
+          type: boolean
+        style: form
+      responses:
+        '200':
+          description: Tile list view-model
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TileListView'
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden
+      x-tastile-required-scope: tastile.read
 components:
   schemas:
     AggregateExprSchema:
-      properties:
-        kind:
-          description: Numeric AggregateFn/TimeScope/TimeSource registry values.
-          format: int32
-          type: integer
-        quantifier:
-          format: int32
-          type:
-          - integer
-          - 'null'
-        reference:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        scope:
-          format: int32
-          type: integer
-        source:
-          format: int32
-          type: integer
+      type: object
       required:
       - kind
       - scope
       - source
-      type: object
-    AggregateMetaSchema:
       properties:
-        change_ids:
-          items:
-            format: uuid
-            type: string
-          type: array
-        changeset_id:
-          format: uuid
+        kind:
+          type: integer
+          format: int32
+          description: Numeric AggregateFn/TimeScope/TimeSource registry values.
+        quantifier:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        reference:
           type:
           - string
           - 'null'
-        flow_ids:
-          items:
-            format: uuid
-            type: string
-          type: array
-        frame_rule_id:
           format: uuid
-          type:
-          - string
-          - 'null'
-        occurrence_ids:
-          items:
-            format: uuid
-            type: string
-          type: array
-        placement_ids:
-          items:
-            format: uuid
-            type: string
-          type: array
-        plan_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        prompt_id:
-          description: 'Id of a Prompt created by `RequestPrompt`.  A Prompt is not an
-
-            Aggregate, so it has no `AggregateRef` and no revision; this is the
-
-            only place its id is returned (v1/14 §13-2).'
-          format: uuid
-          type:
-          - string
-          - 'null'
-        recurring_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        source_tile_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        tile_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        window_ids:
-          items:
-            format: uuid
-            type: string
-          type: array
+        scope:
+          type: integer
+          format: int32
+        source:
+          type: integer
+          format: int32
+    AggregateMetaSchema:
+      type: object
       required:
       - change_ids
       - window_ids
       - flow_ids
       - occurrence_ids
       - placement_ids
-      type: object
-    AggregateRefSchema:
       properties:
-        id:
+        change_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        changeset_id:
+          type:
+          - string
+          - 'null'
           format: uuid
-          type: string
-        kind:
-          format: int32
-          type: integer
+        flow_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        frame_rule_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        occurrence_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        placement_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        plan_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        prompt_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'Id of a Prompt created by `RequestPrompt`.  A Prompt is not an
+
+            Aggregate, so it has no `AggregateRef` and no revision; this is the
+
+            only place its id is returned (v1/14 §13-2).'
+        recurring_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        source_tile_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        tile_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        window_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    AggregateRefSchema:
+      type: object
       required:
       - kind
       - id
-      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
     AnchorSelectorSchema:
+      type: object
+      required:
+      - when
+      - pick
       properties:
         pick:
           $ref: '#/components/schemas/PickSchema'
         when:
           $ref: '#/components/schemas/ConditionRefSchema'
-      required:
-      - when
-      - pick
-      type: object
     ApiTokenCreateRequestSchema:
-      description: '`POST /v1/api-tokens` request body (ADR-0010 §D-1.1).  `expires_at`
+      type: object
+      description: '`POST /v1/api-tokens` request body (ADR-0010 §D-1.1 + Issue #153 §A.1/A.2).
 
-        is required at the wire level — server-side validation rejects
+        `expires_at` is required at the wire level — server-side validation
 
-        `null` / omitted with `ApiErrorKind::VALIDATION`.'
+        rejects `null` / omitted with `ApiErrorKind::VALIDATION`.  `scopes`
+
+        follows the canonical order produced by `ScopeSet::as_canonical_string`
+
+        (`all` → `tastile.read` → `tastile.write`) so the on-the-wire shape is
+
+        deterministic regardless of the order the caller supplied.'
+      required:
+      - label
+      - expires_at
       properties:
         expires_at:
-          format: date-time
           type: string
+          format: date-time
         label:
           type: string
         scopes:
           type:
           - string
           - 'null'
-      required:
-      - label
-      - expires_at
-      type: object
+          description: 'Canonical form: `"all"` (legacy wildcard), `"tastile.read"`,
+
+            `"tastile.write"`, or `"tastile.read tastile.write"`.
+
+            Unknown tokens / `all`-coexistence are rejected with 400
+
+            `invalid_scope`.  Independent-scope model: omitting `scopes`
+
+            while authenticated as a `BearerToken` returns 400
+
+            `scopes_required`.'
     CalendarTermSchema:
+      type: object
+      required:
+      - weekday_mask
+      - holiday_kind
       properties:
         date_range:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/DateRangeSchema'
         holiday_kind:
-          description: Numeric `HolidayKind` registry value.
-          format: int32
           type: integer
-        offset_min:
-          description: 'Fixed offset override; omitted/null inherits the owner timezone.
-
-            Zero explicitly selects UTC.'
           format: int32
+          description: Numeric `HolidayKind` registry value.
+        offset_min:
           type:
           - integer
           - 'null'
+          format: int32
+          description: 'Fixed offset override; omitted/null inherits the owner timezone.
+
+            Zero explicitly selects UTC.'
         time_end:
           oneOf:
           - type: 'null'
@@ -170,59 +944,58 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/TimeOfDaySchema'
         weekday_mask:
-          format: int32
           type: integer
-      required:
-      - weekday_mask
-      - holiday_kind
-      type: object
+          format: int32
     CancelSourceTilePayloadSchema:
+      type: object
+      required:
+      - reason
       properties:
         reason:
+          type: integer
+          format: int32
           description: 'Numeric cancel reason. See `domain::source_tile::state::cancel_reason`
 
             for the registry values.'
-          format: int32
-          type: integer
-      required:
-      - reason
-      type: object
     CancelSourceTileRequest:
-      properties:
-        expected_revision:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        payload:
-          $ref: '#/components/schemas/CancelSourceTilePayloadSchema'
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/CancelSourceTilePayloadSchema'
     CandidateEffectSchema:
+      type: object
+      required:
+      - kind
       properties:
         change:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ChangeRuleSchema'
         idempotency_key:
-          format: uuid
           type:
           - string
           - 'null'
+          format: uuid
         kind:
-          description: Numeric `CandidateEffectKind` registry value.
-          format: int32
           type: integer
+          format: int32
+          description: Numeric `CandidateEffectKind` registry value.
         proposal:
           oneOf:
           - type: 'null'
@@ -231,45 +1004,50 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/RequestDraftSchema'
-      required:
-      - kind
-      type: object
     ChangeKeySchema:
-      properties:
-        group:
-          description: Numeric `ChangeGroup` registry value.
-          format: int32
-          type: integer
-        item:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        part:
-          format: int32
-          type: integer
+      type: object
       required:
       - group
       - part
-      type: object
+      properties:
+        group:
+          type: integer
+          format: int32
+          description: Numeric `ChangeGroup` registry value.
+        item:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        part:
+          type: integer
+          format: int32
     ChangeRuleSchema:
+      type: object
+      required:
+      - id
+      - target
+      - kind
+      - key
+      - source
+      - rank
       properties:
         id:
-          format: uuid
           type: string
+          format: uuid
         key:
           $ref: '#/components/schemas/ChangeKeySchema'
         kind:
+          type: integer
+          format: int32
           description: Numeric `ChangeKind` registry value.
-          format: int32
-          type: integer
         rank:
-          format: int32
           type: integer
+          format: int32
         source:
-          description: Numeric `ChangeSource` registry value.
-          format: int32
           type: integer
+          format: int32
+          description: Numeric `ChangeSource` registry value.
         source_ref:
           oneOf:
           - type: 'null'
@@ -280,151 +1058,149 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ChangeValueSchema'
-      required:
-      - id
-      - target
-      - kind
-      - key
-      - source
-      - rank
-      type: object
     ChangeSourceRefSchema:
+      type: object
       properties:
         decision_run:
-          format: uuid
           type:
           - string
           - 'null'
+          format: uuid
         execution:
-          format: uuid
           type:
           - string
           - 'null'
+          format: uuid
         feedback_txn:
-          format: uuid
           type:
           - string
           - 'null'
+          format: uuid
         flow:
-          format: uuid
           type:
           - string
           - 'null'
+          format: uuid
         frame:
-          format: uuid
           type:
           - string
           - 'null'
+          format: uuid
         recurring:
-          format: uuid
           type:
           - string
           - 'null'
-      type: object
+          format: uuid
     ChangeValueSchema:
       oneOf:
-      - properties:
-          Span:
-            $ref: '#/components/schemas/SpanSchema'
+      - type: object
         required:
         - Span
-        type: object
-      - properties:
-          Instant:
-            format: date-time
-            type: string
+        properties:
+          Span:
+            $ref: '#/components/schemas/SpanSchema'
+      - type: object
         required:
         - Instant
-        type: object
-      - properties:
-          Integer:
-            format: int64
-            type: integer
+        properties:
+          Instant:
+            type: string
+            format: date-time
+      - type: object
         required:
         - Integer
-        type: object
-      - properties:
-          Text:
-            type: string
+        properties:
+          Integer:
+            type: integer
+            format: int64
+      - type: object
         required:
         - Text
-        type: object
-      - properties:
-          Identifier:
-            format: uuid
+        properties:
+          Text:
             type: string
+      - type: object
         required:
         - Identifier
-        type: object
-      - properties:
-          Inside:
-            $ref: '#/components/schemas/InsideSchema'
+        properties:
+          Identifier:
+            type: string
+            format: uuid
+      - type: object
         required:
         - Inside
-        type: object
-      - properties:
-          RangeInteger:
-            $ref: '#/components/schemas/RangeI64Schema'
+        properties:
+          Inside:
+            $ref: '#/components/schemas/InsideSchema'
+      - type: object
         required:
         - RangeInteger
-        type: object
-      - properties:
-          RangeInstant:
-            $ref: '#/components/schemas/RangeInstantSchema'
+        properties:
+          RangeInteger:
+            $ref: '#/components/schemas/RangeI64Schema'
+      - type: object
         required:
         - RangeInstant
-        type: object
-      - properties:
-          Bool:
-            type: boolean
+        properties:
+          RangeInstant:
+            $ref: '#/components/schemas/RangeInstantSchema'
+      - type: object
         required:
         - Bool
-        type: object
-      - properties:
-          TimeRequirementRef:
-            format: uuid
-            type: string
+        properties:
+          Bool:
+            type: boolean
+      - type: object
         required:
         - TimeRequirementRef
-        type: object
-      - properties:
-          TaskDefRef:
-            format: uuid
+        properties:
+          TimeRequirementRef:
             type: string
+            format: uuid
+      - type: object
         required:
         - TaskDefRef
-        type: object
-      - enum:
+        properties:
+          TaskDefRef:
+            type: string
+            format: uuid
+      - type: string
+        enum:
         - None
-        type: string
     ChooseBranchSchema:
+      type: object
+      required:
+      - when
+      - then
       properties:
         then:
           $ref: '#/components/schemas/ScalarExpressionRefSchema'
         when:
           $ref: '#/components/schemas/ConditionRefSchema'
-      required:
-      - when
-      - then
-      type: object
     ChooseExprSchema:
+      type: object
+      required:
+      - branches
       properties:
         branches:
+          type: array
           items:
             $ref: '#/components/schemas/ChooseBranchSchema'
-          type: array
         default:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ScalarExpressionRefSchema'
-      required:
-      - branches
-      type: object
     CommandResponse:
+      type: object
+      required:
+      - command_id
+      - accepted_at
+      - result
+      - pending
       properties:
         accepted_at:
-          format: date-time
           type: string
+          format: date-time
         aggregate:
           oneOf:
           - type: 'null'
@@ -434,420 +1210,418 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/AggregateMetaSchema'
         command_id:
-          format: uuid
           type: string
+          format: uuid
         pending:
+          type: array
           items:
             $ref: '#/components/schemas/PendingWorkSchema'
-          type: array
         result:
-          description: 0 = applied, 1 = already applied, 2 = accepted.
-          format: int32
           type: integer
+          format: int32
+          description: 0 = applied, 1 = already applied, 2 = accepted.
         revision:
-          format: int64
           type:
           - integer
           - 'null'
-      required:
-      - command_id
-      - accepted_at
-      - result
-      - pending
-      type: object
+          format: int64
     CompanionProposalDefinitionSchema:
-      properties:
-        proposal_key:
-          format: uuid
-          type: string
-        relation_kind:
-          format: int32
-          type: integer
-        span:
-          $ref: '#/components/schemas/SpanSchema'
-        target_plan_id:
-          format: uuid
-          type: string
+      type: object
       required:
       - proposal_key
       - target_plan_id
       - span
       - relation_kind
-      type: object
-    CompletionSchema:
       properties:
-        root:
-          $ref: '#/components/schemas/ConditionSchema'
-        tasks:
-          items:
-            $ref: '#/components/schemas/TaskDefinitionSchema'
-          type: array
-        time_requirements:
-          items:
-            $ref: '#/components/schemas/TimeRequirementSchema'
-          type: array
+        proposal_key:
+          type: string
+          format: uuid
+        relation_kind:
+          type: integer
+          format: int32
+        span:
+          $ref: '#/components/schemas/SpanSchema'
+        target_plan_id:
+          type: string
+          format: uuid
+    CompletionSchema:
+      type: object
       required:
       - root
       - time_requirements
       - tasks
-      type: object
+      properties:
+        root:
+          $ref: '#/components/schemas/ConditionSchema'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskDefinitionSchema'
+        time_requirements:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeRequirementSchema'
     ConditionRefSchema:
       $ref: '#/components/schemas/ConditionSchema'
     ConditionSchema:
       oneOf:
-      - properties:
-          All:
-            items:
-              $ref: '#/components/schemas/ConditionRefSchema'
-            type: array
+      - type: object
         required:
         - All
-        type: object
-      - properties:
-          Any:
+        properties:
+          All:
+            type: array
             items:
               $ref: '#/components/schemas/ConditionRefSchema'
-            type: array
+      - type: object
         required:
         - Any
-        type: object
-      - properties:
-          Not:
-            $ref: '#/components/schemas/ConditionRefSchema'
+        properties:
+          Any:
+            type: array
+            items:
+              $ref: '#/components/schemas/ConditionRefSchema'
+      - type: object
         required:
         - Not
-        type: object
-      - properties:
-          Term:
-            $ref: '#/components/schemas/TermSchema'
+        properties:
+          Not:
+            $ref: '#/components/schemas/ConditionRefSchema'
+      - type: object
         required:
         - Term
-        type: object
+        properties:
+          Term:
+            $ref: '#/components/schemas/TermSchema'
     CreateSourceTilePayloadSchema:
-      properties:
-        flows:
-          items:
-            $ref: '#/components/schemas/FlowDefinitionSchema'
-          type: array
-        horizon:
-          $ref: '#/components/schemas/SpanSchema'
-        plan:
-          $ref: '#/components/schemas/SchedulePlanDefinitionSchema'
-        relations:
-          items:
-            $ref: '#/components/schemas/SourceRelationDefinitionPayloadSchema'
-          type:
-          - array
-          - 'null'
-        schedule:
-          $ref: '#/components/schemas/SourceScheduleDefinitionSchema'
-        source_client_local_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        tile:
-          $ref: '#/components/schemas/ScheduleTileDefinitionSchema'
+      type: object
       required:
       - tile
       - plan
       - flows
       - schedule
       - horizon
-      type: object
-    CreateSourceTileRequest:
       properties:
-        expected_revision:
-          format: int64
+        flows:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlowDefinitionSchema'
+        horizon:
+          $ref: '#/components/schemas/SpanSchema'
+        plan:
+          $ref: '#/components/schemas/SchedulePlanDefinitionSchema'
+        relations:
           type:
-          - integer
+          - array
           - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
+          items:
+            $ref: '#/components/schemas/SourceRelationDefinitionPayloadSchema'
+        schedule:
+          $ref: '#/components/schemas/SourceScheduleDefinitionSchema'
+        source_client_local_id:
           type:
           - string
           - 'null'
-        payload:
-          $ref: '#/components/schemas/CreateSourceTilePayloadSchema'
+          format: uuid
+        tile:
+          $ref: '#/components/schemas/ScheduleTileDefinitionSchema'
+    CreateSourceTileRequest:
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
-    DateRangeSchema:
       properties:
-        end:
-          format: date
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
           type: string
-        start:
-          format: date
-          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/CreateSourceTilePayloadSchema'
+    DateRangeSchema:
+      type: object
       required:
       - start
       - end
-      type: object
-    DecisionCandidateSchema:
       properties:
-        effects:
-          items:
-            $ref: '#/components/schemas/CandidateEffectSchema'
-          type: array
-        id:
-          format: uuid
+        end:
           type: string
-        rank:
-          format: int32
-          type: integer
-        when:
-          $ref: '#/components/schemas/ConditionRefSchema'
+          format: date
+        start:
+          type: string
+          format: date
+    DecisionCandidateSchema:
+      type: object
       required:
       - id
       - when
       - rank
       - effects
-      type: object
-    DecisionDefSchema:
       properties:
-        candidates:
-          items:
-            $ref: '#/components/schemas/DecisionCandidateSchema'
+        effects:
           type: array
-        dialog:
-          $ref: '#/components/schemas/InteractionNodeSchema'
+          items:
+            $ref: '#/components/schemas/CandidateEffectSchema'
         id:
-          format: uuid
           type: string
-        observe:
-          description: Numeric `DecisionObserve` registry value.
-          format: int32
+          format: uuid
+        rank:
           type: integer
-        reuse:
-          items:
-            $ref: '#/components/schemas/FeedbackReuseRuleSchema'
-          type: array
+          format: int32
         when:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ConditionRefSchema'
+          $ref: '#/components/schemas/ConditionRefSchema'
+    DecisionDefSchema:
+      type: object
       required:
       - id
       - observe
       - candidates
       - reuse
       - dialog
-      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/DecisionCandidateSchema'
+        dialog:
+          $ref: '#/components/schemas/InteractionNodeSchema'
+        id:
+          type: string
+          format: uuid
+        observe:
+          type: integer
+          format: int32
+          description: Numeric `DecisionObserve` registry value.
+        reuse:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedbackReuseRuleSchema'
+        when:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ConditionRefSchema'
     EmptyPayloadSchema:
-      description: Placeholder for a command whose payload carries no fields.
       type: object
+      description: Placeholder for a command whose payload carries no fields.
     ExecutionLifecycleRequest:
+      type: object
       description: '`PAUSE_EXECUTION` / `RESUME_EXECUTION` take no payload of their own —
 
         the execution id comes from the path, so the wire value of `payload`
 
         is `null` (`CommandRequest<()>`).'
+      required:
+      - idempotency_key
       properties:
         expected_revision:
-          format: int64
           type:
           - integer
           - 'null'
+          format: int64
         idempotency_key:
-          format: uuid
           type: string
+          format: uuid
         occurred_at:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         payload:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/EmptyPayloadSchema'
             description: Always `null`.
-      required:
-      - idempotency_key
-      type: object
     FactComparisonSchema:
       oneOf:
-      - properties:
-          Equal:
-            type: string
+      - type: object
         required:
         - Equal
-        type: object
-      - properties:
-          NotEqual:
+        properties:
+          Equal:
             type: string
+      - type: object
         required:
         - NotEqual
-        type: object
-      - properties:
-          GreaterThan:
-            format: int64
-            type: integer
+        properties:
+          NotEqual:
+            type: string
+      - type: object
         required:
         - GreaterThan
-        type: object
-      - properties:
-          LessThan:
-            format: int64
+        properties:
+          GreaterThan:
             type: integer
+            format: int64
+      - type: object
         required:
         - LessThan
-        type: object
-      - properties:
-          InRange:
-            $ref: '#/components/schemas/RangeI64Schema'
+        properties:
+          LessThan:
+            type: integer
+            format: int64
+      - type: object
         required:
         - InRange
-        type: object
-      - enum:
+        properties:
+          InRange:
+            $ref: '#/components/schemas/RangeI64Schema'
+      - type: string
+        enum:
         - Exists
-        type: string
-      - enum:
+      - type: string
+        enum:
         - Missing
-        type: string
     FactTermSchema:
+      type: object
+      required:
+      - key
+      - comparison
       properties:
         comparison:
           $ref: '#/components/schemas/FactComparisonSchema'
         key:
           type: string
-      required:
-      - key
-      - comparison
-      type: object
     FeedbackMappingSchema:
+      type: object
+      required:
+      - id
+      - target
+      - key
+      - kind
       properties:
         id:
-          format: uuid
           type: string
+          format: uuid
         key:
           $ref: '#/components/schemas/ChangeKeySchema'
         kind:
-          description: Numeric `ChangeKind` registry value.
-          format: int32
           type: integer
+          format: int32
+          description: Numeric `ChangeKind` registry value.
         target:
           $ref: '#/components/schemas/TargetRefSchema'
         value:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ChangeValueSchema'
-      required:
-      - id
-      - target
-      - key
-      - kind
-      type: object
     FeedbackReuseRuleSchema:
-      properties:
-        apply:
-          items:
-            $ref: '#/components/schemas/FeedbackMappingSchema'
-          type: array
-        id:
-          format: uuid
-          type: string
-        source:
-          $ref: '#/components/schemas/FeedbackSelectorSchema'
-        when:
-          $ref: '#/components/schemas/ConditionRefSchema'
+      type: object
       required:
       - id
       - when
       - source
       - apply
-      type: object
+      properties:
+        apply:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedbackMappingSchema'
+        id:
+          type: string
+          format: uuid
+        source:
+          $ref: '#/components/schemas/FeedbackSelectorSchema'
+        when:
+          $ref: '#/components/schemas/ConditionRefSchema'
     FeedbackSelectorSchema:
       oneOf:
-      - enum:
+      - type: string
+        enum:
         - All
-        type: string
-      - properties:
-          Feedback:
-            format: uuid
-            type: string
+      - type: object
         required:
         - Feedback
-        type: object
-      - properties:
-          Within:
-            format: int64
-            type: integer
+        properties:
+          Feedback:
+            type: string
+            format: uuid
+      - type: object
         required:
         - Within
-        type: object
+        properties:
+          Within:
+            type: integer
+            format: int64
     FeedbackTermSchema:
-      properties:
-        feedback_txn:
-          format: uuid
-          type: string
-        state:
-          description: Numeric `FeedbackState` newtype value.
-          format: int32
-          type: integer
+      type: object
       required:
       - feedback_txn
       - state
-      type: object
+      properties:
+        feedback_txn:
+          type: string
+          format: uuid
+        state:
+          type: integer
+          format: int32
+          description: Numeric `FeedbackState` newtype value.
     FinishExecutionPayloadSchema:
+      type: object
+      required:
+      - kind
       properties:
         kind:
+          type: integer
+          format: int32
           description: 'Numeric finish kind (v1/02 §Execution 終了情報). Opaque smallint
 
             until the v1.1 registry publishes the values.'
-          format: int32
-          type: integer
         note:
           type:
           - string
           - 'null'
-      required:
-      - kind
-      type: object
     FinishExecutionRequest:
-      properties:
-        expected_revision:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        payload:
-          $ref: '#/components/schemas/FinishExecutionPayloadSchema'
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/FinishExecutionPayloadSchema'
     FlowDefinitionSchema:
+      type: object
+      required:
+      - observes
+      - candidates
       properties:
         candidates:
+          type: array
           items:
             $ref: '#/components/schemas/ScheduleFlowCandidateDefinitionSchema'
-          type: array
         observes:
+          type: array
           items:
             $ref: '#/components/schemas/ScheduleFlowSignalSchema'
-          type: array
         when:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ConditionRefSchema'
-      required:
-      - observes
-      - candidates
-      type: object
     GapAnchorsSchema:
+      type: object
+      required:
+      - left
+      - right
       properties:
         left:
           $ref: '#/components/schemas/AnchorSelectorSchema'
@@ -857,11 +1631,12 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/RangeI64Schema'
-      required:
-      - left
-      - right
-      type: object
     GapTermSchema:
+      type: object
+      required:
+      - scope
+      - left_anchor
+      - right_anchor
       properties:
         left_anchor:
           $ref: '#/components/schemas/AnchorSelectorSchema'
@@ -873,97 +1648,95 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/RangeI64Schema'
-      required:
-      - scope
-      - left_anchor
-      - right_anchor
-      type: object
     InsideSchema:
-      properties:
-        parent:
-          format: uuid
-          type: string
-        scope:
-          description: Numeric `ScopeKind` registry value.
-          format: int32
-          type: integer
+      type: object
       required:
       - parent
       - scope
-      type: object
-    InteractionInputSchema:
       properties:
-        acceptance:
-          description: Numeric `InputAcceptance` registry value.
-          format: int32
-          type: integer
-        current:
-          items:
-            $ref: '#/components/schemas/ChangeValueSchema'
-          type: array
-        enabled:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ConditionRefSchema'
-        id:
-          format: uuid
+        parent:
           type: string
-        options:
-          items:
-            $ref: '#/components/schemas/InteractionOptionSchema'
-          type: array
-        visible:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ConditionRefSchema'
+          format: uuid
+        scope:
+          type: integer
+          format: int32
+          description: Numeric `ScopeKind` registry value.
+    InteractionInputSchema:
+      type: object
       required:
       - id
       - current
       - options
       - acceptance
-      type: object
+      properties:
+        acceptance:
+          type: integer
+          format: int32
+          description: Numeric `InputAcceptance` registry value.
+        current:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChangeValueSchema'
+        enabled:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ConditionRefSchema'
+        id:
+          type: string
+          format: uuid
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/InteractionOptionSchema'
+        visible:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ConditionRefSchema'
     InteractionNodeRefSchema:
       $ref: '#/components/schemas/InteractionNodeSchema'
     InteractionNodeSchema:
+      type: object
+      required:
+      - id
+      - view
+      - inputs
+      - children
       properties:
         children:
+          type: array
           items:
             $ref: '#/components/schemas/InteractionNodeRefSchema'
-          type: array
         id:
-          format: uuid
           type: string
+          format: uuid
         inputs:
+          type: array
           items:
             $ref: '#/components/schemas/InteractionInputSchema'
-          type: array
         view:
           $ref: '#/components/schemas/InteractionViewSchema'
         visible:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ConditionRefSchema'
-      required:
-      - id
-      - view
-      - inputs
-      - children
-      type: object
     InteractionOptionSchema:
-      properties:
-        id:
-          format: uuid
-          type: string
-        label:
-          type: string
-        value:
-          $ref: '#/components/schemas/ChangeValueSchema'
+      type: object
       required:
       - id
       - label
       - value
-      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        value:
+          $ref: '#/components/schemas/ChangeValueSchema'
     InteractionViewSchema:
+      type: object
+      required:
+      - title
       properties:
         body:
           type:
@@ -971,253 +1744,257 @@ components:
           - 'null'
         title:
           type: string
-      required:
-      - title
-      type: object
     LifeStateSchema:
+      type: string
       enum:
       - Active
       - Paused
       - Closed
       - Voided
-      type: string
     LifeTargetSchema:
       oneOf:
-      - properties:
-          Tile:
-            format: uuid
-            type: string
+      - type: object
         required:
         - Tile
-        type: object
-      - properties:
-          Placement:
-            format: uuid
+        properties:
+          Tile:
             type: string
+            format: uuid
+      - type: object
         required:
         - Placement
-        type: object
-      - properties:
-          Execution:
-            format: uuid
+        properties:
+          Placement:
             type: string
+            format: uuid
+      - type: object
         required:
         - Execution
-        type: object
-      - properties:
-          Recurring:
-            format: uuid
+        properties:
+          Execution:
             type: string
+            format: uuid
+      - type: object
         required:
         - Recurring
-        type: object
+        properties:
+          Recurring:
+            type: string
+            format: uuid
     LifeTermSchema:
+      type: object
+      required:
+      - target
+      - state
       properties:
         state:
           $ref: '#/components/schemas/LifeStateSchema'
         target:
           $ref: '#/components/schemas/LifeTargetSchema'
-      required:
-      - target
-      - state
-      type: object
     MetricComparisonSchema:
       oneOf:
-      - properties:
-          Equal:
-            format: int64
-            type: integer
+      - type: object
         required:
         - Equal
-        type: object
-      - properties:
-          NotEqual:
-            format: int64
+        properties:
+          Equal:
             type: integer
+            format: int64
+      - type: object
         required:
         - NotEqual
-        type: object
-      - properties:
-          GreaterThan:
-            format: int64
+        properties:
+          NotEqual:
             type: integer
+            format: int64
+      - type: object
         required:
         - GreaterThan
-        type: object
-      - properties:
-          LessThan:
-            format: int64
+        properties:
+          GreaterThan:
             type: integer
+            format: int64
+      - type: object
         required:
         - LessThan
-        type: object
-      - properties:
-          InRange:
-            $ref: '#/components/schemas/RangeI64Schema'
+        properties:
+          LessThan:
+            type: integer
+            format: int64
+      - type: object
         required:
         - InRange
-        type: object
-      - enum:
+        properties:
+          InRange:
+            $ref: '#/components/schemas/RangeI64Schema'
+      - type: string
+        enum:
         - Exists
-        type: string
-      - enum:
+      - type: string
+        enum:
         - Missing
-        type: string
     MetricDefSchema:
+      type: object
+      required:
+      - id
+      - output
+      - expression
       properties:
         expression:
           $ref: '#/components/schemas/ScalarExpressionSchema'
         id:
-          format: uuid
           type: string
+          format: uuid
         limit:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/RangeI64Schema'
         output:
-          description: Numeric `MetricOutput` registry value.
-          format: int32
           type: integer
-      required:
-      - id
-      - output
-      - expression
-      type: object
+          format: int32
+          description: Numeric `MetricOutput` registry value.
     MetricTermSchema:
+      type: object
+      required:
+      - metric_id
+      - comparison
       properties:
         comparison:
           $ref: '#/components/schemas/MetricComparisonSchema'
         metric_id:
-          format: uuid
           type: string
-      required:
-      - metric_id
-      - comparison
-      type: object
+          format: uuid
     MomentComparisonSchema:
       oneOf:
-      - properties:
-          At:
-            format: date-time
-            type: string
+      - type: object
         required:
         - At
-        type: object
-      - properties:
-          Before:
-            $ref: '#/components/schemas/MomentTargetSchema'
+        properties:
+          At:
+            type: string
+            format: date-time
+      - type: object
         required:
         - Before
-        type: object
-      - properties:
-          After:
+        properties:
+          Before:
             $ref: '#/components/schemas/MomentTargetSchema'
+      - type: object
         required:
         - After
-        type: object
-      - description: Exactly two targets on the serde wire.
         properties:
-          Between:
-            description: Exactly two targets on the serde wire.
-            items:
-              $ref: '#/components/schemas/MomentTargetSchema'
-            type: array
+          After:
+            $ref: '#/components/schemas/MomentTargetSchema'
+      - type: object
+        description: Exactly two targets on the serde wire.
         required:
         - Between
-        type: object
-      - properties:
-          Within:
-            $ref: '#/components/schemas/RangeI64Schema'
+        properties:
+          Between:
+            type: array
+            items:
+              $ref: '#/components/schemas/MomentTargetSchema'
+            description: Exactly two targets on the serde wire.
+      - type: object
         required:
         - Within
-        type: object
+        properties:
+          Within:
+            $ref: '#/components/schemas/RangeI64Schema'
     MomentSchema:
       oneOf:
-      - properties:
-          Absolute:
-            format: date-time
-            type: string
+      - type: object
         required:
         - Absolute
-        type: object
-      - properties:
+        properties:
+          Absolute:
+            type: string
+            format: date-time
+      - type: object
+        required:
+        - Reference
+        properties:
           Reference:
+            type: array
             items:
               type: object
             maxItems: 3
             minItems: 3
-            type: array
-        required:
-        - Reference
-        type: object
     MomentTargetSchema:
       oneOf:
-      - properties:
-          Context:
-            format: int32
-            type: integer
+      - type: object
         required:
         - Context
-        type: object
-      - properties:
-          Reference:
-            format: uuid
-            type: string
+        properties:
+          Context:
+            type: integer
+            format: int32
+      - type: object
         required:
         - Reference
-        type: object
-      - properties:
-          Placement:
-            format: uuid
+        properties:
+          Reference:
             type: string
+            format: uuid
+      - type: object
         required:
         - Placement
-        type: object
-      - properties:
-          Execution:
-            format: uuid
+        properties:
+          Placement:
             type: string
+            format: uuid
+      - type: object
         required:
         - Execution
-        type: object
-      - properties:
-          Frame:
-            format: uuid
+        properties:
+          Execution:
             type: string
+            format: uuid
+      - type: object
         required:
         - Frame
-        type: object
+        properties:
+          Frame:
+            type: string
+            format: uuid
     MomentTermSchema:
-      properties:
-        comparison:
-          $ref: '#/components/schemas/MomentComparisonSchema'
-        offset:
-          format: int64
-          type: integer
-        point:
-          description: Numeric `PointReference` registry value.
-          format: int32
-          type: integer
-        target:
-          $ref: '#/components/schemas/MomentTargetSchema'
+      type: object
       required:
       - point
       - target
       - offset
       - comparison
-      type: object
+      properties:
+        comparison:
+          $ref: '#/components/schemas/MomentComparisonSchema'
+        offset:
+          type: integer
+          format: int64
+        point:
+          type: integer
+          format: int32
+          description: Numeric `PointReference` registry value.
+        target:
+          $ref: '#/components/schemas/MomentTargetSchema'
     NestingRuleSchema:
+      type: object
+      required:
+      - id
+      - direction
+      - rank
+      - target
+      - scope
       properties:
         direction:
+          type: integer
+          format: int32
           description: Numeric `NestingDirection` registry value.
-          format: int32
-          type: integer
         id:
-          format: uuid
           type: string
+          format: uuid
         rank:
-          format: int32
           type: integer
+          format: int32
         scope:
           $ref: '#/components/schemas/ScopeSchema'
         target:
@@ -1226,53 +2003,47 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ConditionRefSchema'
-      required:
-      - id
-      - direction
-      - rank
-      - target
-      - scope
-      type: object
     NewPlanProposalDefinitionSchema:
+      type: object
+      required:
+      - span
       properties:
         span:
           $ref: '#/components/schemas/SpanSchema'
-      required:
-      - span
-      type: object
     OperateExprSchema:
-      properties:
-        op:
-          description: Numeric `OperateKind` registry value.
-          format: int32
-          type: integer
-        operands:
-          items:
-            $ref: '#/components/schemas/ScalarExpressionRefSchema'
-          type: array
+      type: object
       required:
       - op
       - operands
-      type: object
-    OutputSequenceStepSchema:
       properties:
-        emit_duration_ms:
-          format: int64
+        op:
           type: integer
-        target_plan_id:
-          description: Optional per-step Plan target; omitted steps inherit the output proposal Plan.
-          format: uuid
-          type:
-          - string
-          - 'null'
-        wait_before_ms:
-          format: int64
-          type: integer
+          format: int32
+          description: Numeric `OperateKind` registry value.
+        operands:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScalarExpressionRefSchema'
+    OutputSequenceStepSchema:
+      type: object
       required:
       - wait_before_ms
       - emit_duration_ms
-      type: object
+      properties:
+        emit_duration_ms:
+          type: integer
+          format: int64
+        target_plan_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Optional per-step Plan target; omitted steps inherit the output proposal Plan.
+        wait_before_ms:
+          type: integer
+          format: int64
     OwnerDeleteResponseSchema:
+      type: object
       description: 'Response body for `DELETE /v1/owners/{kind}/{id}` (ADR-0010 §D-3.5).
 
         `kept` lists the table names that the tombstone left in place
@@ -1280,53 +2051,55 @@ components:
         (immediate delete did NOT remove them) so a future purge-job
 
         schema-drift detector has a stable hint.'
-      properties:
-        deleted_at:
-          format: date-time
-          type: string
-        kept:
-          items:
-            type: string
-          type: array
-        retention_until:
-          format: date-time
-          type: string
       required:
       - deleted_at
       - retention_until
       - kept
-      type: object
-    PendingWorkSchema:
       properties:
-        expected_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        kind:
-          format: int32
-          type: integer
-        work_item_id:
-          format: uuid
+        deleted_at:
           type: string
+          format: date-time
+        kept:
+          type: array
+          items:
+            type: string
+        retention_until:
+          type: string
+          format: date-time
+    PendingWorkSchema:
+      type: object
       required:
       - kind
       - work_item_id
-      type: object
+      properties:
+        expected_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        kind:
+          type: integer
+          format: int32
+        work_item_id:
+          type: string
+          format: uuid
     PickSchema:
+      type: object
+      required:
+      - kind
       properties:
         at:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/MomentSchema'
         kind:
-          description: Numeric `PickKind` registry value.
-          format: int32
           type: integer
-      required:
-      - kind
-      type: object
+          format: int32
+          description: Numeric `PickKind` registry value.
     PlacementBaselineSchema:
+      type: object
+      required:
+      - span
       properties:
         inside:
           oneOf:
@@ -1334,119 +2107,82 @@ components:
           - $ref: '#/components/schemas/InsideSchema'
         span:
           $ref: '#/components/schemas/SpanSchema'
-      required:
-      - span
-      type: object
     PlacementProposalDraftSchema:
-      properties:
-        baseline:
-          $ref: '#/components/schemas/PlacementBaselineSchema'
-        id:
-          format: uuid
-          type: string
-        inside:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/InsideSchema'
-        plan_id:
-          format: uuid
-          type: string
-        proposal_key:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ProposalKeySchema'
-        tile_id:
-          format: uuid
-          type: string
+      type: object
       required:
       - id
       - tile_id
       - plan_id
       - baseline
-      type: object
+      properties:
+        baseline:
+          $ref: '#/components/schemas/PlacementBaselineSchema'
+        id:
+          type: string
+          format: uuid
+        inside:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/InsideSchema'
+        plan_id:
+          type: string
+          format: uuid
+        proposal_key:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProposalKeySchema'
+        tile_id:
+          type: string
+          format: uuid
     PlacementRuleEffectSchema:
+      type: object
+      required:
+      - kind
       properties:
         kind:
-          description: Numeric `PlacementRuleEffectKind` registry value.
-          format: int32
           type: integer
-        record:
-          description: Numeric `RecordRequirement` registry value.
           format: int32
+          description: Numeric `PlacementRuleEffectKind` registry value.
+        record:
           type:
           - integer
           - 'null'
+          format: int32
+          description: Numeric `RecordRequirement` registry value.
         scope:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ScopeSchema'
         score:
-          format: int32
           type:
           - integer
           - 'null'
+          format: int32
         span:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/RangeI64Schema'
-      required:
-      - kind
-      type: object
     PlacementRuleSchema:
-      properties:
-        effect:
-          $ref: '#/components/schemas/PlacementRuleEffectSchema'
-        id:
-          format: uuid
-          type: string
-        rank:
-          format: int32
-          type: integer
-        when:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ConditionRefSchema'
+      type: object
       required:
       - id
       - rank
       - effect
-      type: object
-    PlacementTileRead:
       properties:
-        closed:
-          type: boolean
-        closed_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        end:
-          format: date-time
+        effect:
+          $ref: '#/components/schemas/PlacementRuleEffectSchema'
+        id:
           type: string
-        occurrence_id:
           format: uuid
-          type: string
-        placement_id:
-          format: uuid
-          type: string
-        revision:
-          format: int64
+        rank:
           type: integer
-        source_tile_id:
-          format: uuid
-          type: string
-        split_count:
           format: int32
-          type: integer
-        split_group_id:
-          format: uuid
-          type: string
-        split_index:
-          format: int32
-          type: integer
-        start:
-          format: date-time
-          type: string
+        when:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ConditionRefSchema'
+    PlacementTileRead:
+      type: object
       required:
       - placement_id
       - source_tile_id
@@ -1458,37 +2194,76 @@ components:
       - end
       - closed
       - revision
-      type: object
-    PromptSubjectSchema:
       properties:
-        id:
-          format: uuid
-          type: string
-        kind:
-          description: '`AggregateKind` (0 RECURRING / 1 PLACEMENT / 2 EXECUTION / 3 SESSION / 4 SOURCE).'
-          format: int32
-          type: integer
-      required:
-      - kind
-      - id
-      type: object
-    PromptView:
-      properties:
-        created_at:
-          format: date-time
-          type: string
-        expires_at:
-          format: date-time
+        closed:
+          type: boolean
+        closed_at:
           type:
           - string
           - 'null'
-        id:
-          format: uuid
+          format: date-time
+        end:
           type: string
-        kind:
-          description: '`PromptKind` (v1/14 §13-3).'
-          format: int32
+          format: date-time
+        occurrence_id:
+          type: string
+          format: uuid
+        placement_id:
+          type: string
+          format: uuid
+        revision:
           type: integer
+          format: int64
+        source_tile_id:
+          type: string
+          format: uuid
+        split_count:
+          type: integer
+          format: int32
+        split_group_id:
+          type: string
+          format: uuid
+        split_index:
+          type: integer
+          format: int32
+        start:
+          type: string
+          format: date-time
+    PromptSubjectSchema:
+      type: object
+      required:
+      - kind
+      - id
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+          description: '`AggregateKind` (0 RECURRING / 1 PLACEMENT / 2 EXECUTION / 3 SESSION / 4 SOURCE).'
+    PromptView:
+      type: object
+      required:
+      - id
+      - kind
+      - created_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+          description: '`PromptKind` (v1/14 §13-3).'
         note:
           type:
           - string
@@ -1497,46 +2272,48 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/PromptSubjectSchema'
-      required:
-      - id
-      - kind
-      - created_at
-      type: object
     ProposalKeySchema:
-      properties:
-        local_id:
-          format: uuid
-          type: string
-        producer_id:
-          format: uuid
-          type: string
+      type: object
       required:
       - producer_id
       - local_id
-      type: object
+      properties:
+        local_id:
+          type: string
+          format: uuid
+        producer_id:
+          type: string
+          format: uuid
     PublishScheduleDefinitionPayloadSchema:
+      type: object
+      required:
+      - tile
+      - plan
+      - reference_targets
+      - windows
+      - flows
       properties:
         flows:
+          type: array
           items:
             $ref: '#/components/schemas/FlowDefinitionSchema'
-          type: array
         plan:
           $ref: '#/components/schemas/SchedulePlanDefinitionSchema'
         recurrence: {}
         reference_targets:
-          items: {}
           type: array
+          items: {}
         relations:
-          items:
-            $ref: '#/components/schemas/SourceRelationDefinitionPayloadSchema'
           type:
           - array
           - 'null'
+          items:
+            $ref: '#/components/schemas/SourceRelationDefinitionPayloadSchema'
         source_client_local_id:
-          format: uuid
           type:
           - string
           - 'null'
+          format: uuid
         source_horizon:
           oneOf:
           - type: 'null'
@@ -1548,250 +2325,201 @@ components:
         tile:
           $ref: '#/components/schemas/ScheduleTileDefinitionSchema'
         windows:
-          items: {}
           type: array
-      required:
-      - tile
-      - plan
-      - reference_targets
-      - windows
-      - flows
-      type: object
+          items: {}
     PublishScheduleDefinitionRequest:
-      properties:
-        expected_revision:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        owner_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        payload:
-          $ref: '#/components/schemas/PublishScheduleDefinitionPayloadSchema'
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        payload:
+          $ref: '#/components/schemas/PublishScheduleDefinitionPayloadSchema'
     RangeI64Schema:
+      type: object
       properties:
         max:
-          format: int64
           type:
           - integer
           - 'null'
+          format: int64
         min:
-          format: int64
           type:
           - integer
           - 'null'
-      type: object
+          format: int64
     RangeInstantSchema:
+      type: object
       properties:
         max:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         min:
-          format: date-time
           type:
           - string
           - 'null'
-      type: object
+          format: date-time
     ReadTargetSchema:
       oneOf:
-      - properties:
-          FrameDuration:
-            format: uuid
-            type: string
+      - type: object
         required:
         - FrameDuration
-        type: object
-      - properties:
-          PlacementSpan:
-            format: uuid
+        properties:
+          FrameDuration:
             type: string
+            format: uuid
+      - type: object
         required:
         - PlacementSpan
-        type: object
-      - properties:
-          ExecutionActiveDuration:
-            format: uuid
+        properties:
+          PlacementSpan:
             type: string
+            format: uuid
+      - type: object
         required:
         - ExecutionActiveDuration
-        type: object
-      - properties:
+        properties:
+          ExecutionActiveDuration:
+            type: string
+            format: uuid
+      - type: object
+        required:
+        - Fact
+        properties:
           Fact:
+            type: array
             items:
               type: object
             maxItems: 2
             minItems: 2
-            type: array
-        required:
-        - Fact
-        type: object
-      - properties:
-          Metric:
-            format: uuid
-            type: string
+      - type: object
         required:
         - Metric
-        type: object
-      - properties:
-          RequirementMet:
-            format: uuid
+        properties:
+          Metric:
             type: string
+            format: uuid
+      - type: object
         required:
         - RequirementMet
-        type: object
-      - properties:
-          TaskCompleted:
-            format: uuid
+        properties:
+          RequirementMet:
             type: string
+            format: uuid
+      - type: object
         required:
         - TaskCompleted
-        type: object
+        properties:
+          TaskCompleted:
+            type: string
+            format: uuid
     RecurrenceView:
+      type: object
       description: Recurrence model summary (mirror of `domain::read::RecurrenceView`).
+      required:
+      - step_min
+      - window_start_min
+      - window_end_min
       properties:
         expression:
           type:
           - string
           - 'null'
         step_min:
-          format: int32
           type: integer
+          format: int32
         window_end_min:
-          format: int32
           type: integer
+          format: int32
         window_start_min:
-          format: int32
           type: integer
-      required:
-      - step_min
-      - window_start_min
-      - window_end_min
-      type: object
+          format: int32
     ReferenceDefSchema:
+      type: object
+      required:
+      - id
+      - target
+      - pick
       properties:
         id:
-          format: uuid
           type: string
+          format: uuid
         pick:
           $ref: '#/components/schemas/PickSchema'
         target:
-          description: Numeric `TargetSelector` registry value.
-          format: int32
           type: integer
+          format: int32
+          description: Numeric `TargetSelector` registry value.
         when:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ConditionRefSchema'
+    ReferenceSchema:
+      type: object
       required:
       - id
       - target
       - pick
-      type: object
-    ReferenceSchema:
       properties:
         id:
-          format: uuid
           type: string
+          format: uuid
         pick:
           $ref: '#/components/schemas/PickSchema'
         target:
-          description: Numeric `TargetSelector` registry value.
-          format: int32
           type: integer
-      required:
-      - id
-      - target
-      - pick
-      type: object
+          format: int32
+          description: Numeric `TargetSelector` registry value.
     ReflowSourceTilePayloadSchema:
+      type: object
+      required:
+      - range
       properties:
         range:
           $ref: '#/components/schemas/SpanSchema'
-      required:
-      - range
-      type: object
     ReflowSourceTileRequest:
-      properties:
-        expected_revision:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        payload:
-          $ref: '#/components/schemas/ReflowSourceTilePayloadSchema'
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
-    RelationDefinitionRead:
       properties:
-        anchor_at:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
           format: date-time
-          type: string
-        client_local_id:
-          format: uuid
-          type: string
-        correlation_scope:
-          format: int32
-          type: integer
-        duration:
-          $ref: '#/components/schemas/RelationDurationExpressionRead'
-        eligible_through_revision:
-          format: int64
-          type: integer
-        id:
-          format: uuid
-          type: string
-        kind:
-          format: int32
-          type: integer
-        lifecycle_filter:
-          format: int32
-          minimum: 0
-          type: integer
-        ordering:
-          $ref: '#/components/schemas/SelectionOrderingSchema'
-        owner_id:
-          format: uuid
-          type: string
-        reference:
-          $ref: '#/components/schemas/RelationPointReferenceRead'
-        revision:
-          format: int64
-          type: integer
-        source_id:
-          format: uuid
-          type: string
-        split_policy:
-          $ref: '#/components/schemas/RelationSplitPolicySchema'
-        summary_priority:
-          format: int32
-          type: integer
+        payload:
+          $ref: '#/components/schemas/ReflowSourceTilePayloadSchema'
+    RelationDefinitionRead:
+      type: object
       required:
       - id
       - client_local_id
@@ -1808,182 +2536,227 @@ components:
       - anchor_at
       - eligible_through_revision
       - summary_priority
-      type: object
+      properties:
+        anchor_at:
+          type: string
+          format: date-time
+        client_local_id:
+          type: string
+          format: uuid
+        correlation_scope:
+          type: integer
+          format: int32
+        duration:
+          $ref: '#/components/schemas/RelationDurationExpressionRead'
+        eligible_through_revision:
+          type: integer
+          format: int64
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+        lifecycle_filter:
+          type: integer
+          format: int32
+          minimum: 0
+        ordering:
+          $ref: '#/components/schemas/SelectionOrderingSchema'
+        owner_id:
+          type: string
+          format: uuid
+        reference:
+          $ref: '#/components/schemas/RelationPointReferenceRead'
+        revision:
+          type: integer
+          format: int64
+        source_id:
+          type: string
+          format: uuid
+        split_policy:
+          $ref: '#/components/schemas/RelationSplitPolicySchema'
+        summary_priority:
+          type: integer
+          format: int32
     RelationDurationExpressionRead:
       oneOf:
-      - properties:
-          Fixed:
-            format: int64
-            type: integer
+      - type: object
         required:
         - Fixed
-        type: object
-      - properties:
-          ReferenceSpan:
-            properties:
-              source_id:
-                format: uuid
-                type: string
-            required:
-            - source_id
-            type: object
+        properties:
+          Fixed:
+            type: integer
+            format: int64
+      - type: object
         required:
         - ReferenceSpan
-        type: object
+        properties:
+          ReferenceSpan:
+            type: object
+            required:
+            - source_id
+            properties:
+              source_id:
+                type: string
+                format: uuid
     RelationPointReferenceRead:
-      properties:
-        offset_ms:
-          format: int64
-          type: integer
-        point:
-          format: int32
-          type: integer
-        source_id:
-          format: uuid
-          type: string
+      type: object
       required:
       - source_id
       - point
       - offset_ms
-      type: object
+      properties:
+        offset_ms:
+          type: integer
+          format: int64
+        point:
+          type: integer
+          format: int32
+        source_id:
+          type: string
+          format: uuid
     RelationSplitPolicySchema:
       oneOf:
-      - properties:
-          Unsplit:
-            properties:
-              required_total_duration_ms:
-                format: int64
-                type: integer
-            required:
-            - required_total_duration_ms
-            type: object
+      - type: object
         required:
         - Unsplit
-        type: object
-      - properties:
-          Split:
+        properties:
+          Unsplit:
+            type: object
+            required:
+            - required_total_duration_ms
             properties:
-              max_segment_ms:
-                format: int64
-                type: integer
-              min_segment_ms:
-                format: int64
-                type: integer
               required_total_duration_ms:
-                format: int64
                 type: integer
+                format: int64
+      - type: object
+        required:
+        - Split
+        properties:
+          Split:
+            type: object
             required:
             - required_total_duration_ms
             - min_segment_ms
             - max_segment_ms
-            type: object
-        required:
-        - Split
-        type: object
+            properties:
+              max_segment_ms:
+                type: integer
+                format: int64
+              min_segment_ms:
+                type: integer
+                format: int64
+              required_total_duration_ms:
+                type: integer
+                format: int64
     RelationTermSchema:
-      properties:
-        reference_id:
-          format: uuid
-          type: string
-        relation:
-          description: Numeric `Relation` registry value.
-          format: int32
-          type: integer
-        window_kind:
-          $ref: '#/components/schemas/RelationWindowKindSchema'
-          description: Serde textual `RelationWindowKind` variant.
+      type: object
       required:
       - reference_id
       - relation
       - window_kind
-      type: object
+      properties:
+        reference_id:
+          type: string
+          format: uuid
+        relation:
+          type: integer
+          format: int32
+          description: Numeric `Relation` registry value.
+        window_kind:
+          $ref: '#/components/schemas/RelationWindowKindSchema'
+          description: Serde textual `RelationWindowKind` variant.
     RelationWindowKindSchema:
+      type: string
       enum:
       - Root
       - LabelSpan
       - ParentSpan
       - Gap
-      type: string
     RequestDraftSchema:
+      type: object
+      required:
+      - id
+      - kind
+      - idempotency_key
       properties:
         id:
-          format: uuid
           type: string
+          format: uuid
         idempotency_key:
-          format: uuid
           type: string
+          format: uuid
         kind:
           $ref: '#/components/schemas/RequestKindSchema'
         payload:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ChangeValueSchema'
-      required:
-      - id
-      - kind
-      - idempotency_key
-      type: object
     RequestKindSchema:
       oneOf:
-      - properties:
-          StartExecution:
-            format: uuid
-            type: string
+      - type: object
         required:
         - StartExecution
-        type: object
-      - properties:
-          FinishExecution:
-            format: uuid
+        properties:
+          StartExecution:
             type: string
+            format: uuid
+      - type: object
         required:
         - FinishExecution
-        type: object
-      - properties:
-          PauseExecution:
-            format: uuid
+        properties:
+          FinishExecution:
             type: string
+            format: uuid
+      - type: object
         required:
         - PauseExecution
-        type: object
-      - properties:
-          ResumeExecution:
-            format: uuid
+        properties:
+          PauseExecution:
             type: string
+            format: uuid
+      - type: object
         required:
         - ResumeExecution
-        type: object
-      - properties:
-          RecordFact:
-            format: uuid
+        properties:
+          ResumeExecution:
             type: string
+            format: uuid
+      - type: object
         required:
         - RecordFact
-        type: object
-      - properties:
-          MarkTask:
-            items:
-              format: uuid
-              type: string
-            maxItems: 2
-            minItems: 2
-            type: array
+        properties:
+          RecordFact:
+            type: string
+            format: uuid
+      - type: object
         required:
         - MarkTask
-        type: object
+        properties:
+          MarkTask:
+            type: array
+            items:
+              type: string
+              format: uuid
+            maxItems: 2
+            minItems: 2
     RequestPromptPayloadSchema:
+      type: object
+      required:
+      - kind
       properties:
         expires_at:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         kind:
+          type: integer
+          format: int32
           description: '`PromptKind` — 0 STARTUP_RECOVERY / 1 MISSED_START /
 
             2 DECISION_REQUIRED / 3 STALE_ACTIVE_EXECUTION (v1/14 §13-3).'
-          format: int32
-          type: integer
         note:
           type:
           - string
@@ -1992,189 +2765,187 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/PromptSubjectSchema'
-      required:
-      - kind
-      type: object
     RequestPromptRequest:
-      properties:
-        expected_revision:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        owner_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        payload:
-          $ref: '#/components/schemas/RequestPromptPayloadSchema'
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        payload:
+          $ref: '#/components/schemas/RequestPromptPayloadSchema'
     RequirementStateSchema:
+      type: string
       enum:
       - Met
       - Unmet
       - Any
-      type: string
     RequirementTermSchema:
+      type: object
+      required:
+      - time_requirement
+      - state
       properties:
         state:
           $ref: '#/components/schemas/RequirementStateSchema'
         time_requirement:
-          format: uuid
           type: string
-      required:
-      - time_requirement
-      - state
-      type: object
+          format: uuid
     ResolvePromptPayloadSchema:
+      type: object
+      required:
+      - resolution
       properties:
         resolution:
-          description: '`PromptResolution` — 0 ACKNOWLEDGED / 1 DISMISSED / 2 ACTION_TAKEN.'
-          format: int32
           type: integer
+          format: int32
+          description: '`PromptResolution` — 0 ACKNOWLEDGED / 1 DISMISSED / 2 ACTION_TAKEN.'
         response_note:
           type:
           - string
           - 'null'
-      required:
-      - resolution
-      type: object
     ResolvePromptRequest:
-      properties:
-        expected_revision:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        owner_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        payload:
-          $ref: '#/components/schemas/ResolvePromptPayloadSchema'
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        payload:
+          $ref: '#/components/schemas/ResolvePromptPayloadSchema'
     ScalarExpressionRefSchema:
       $ref: '#/components/schemas/ScalarExpressionSchema'
     ScalarExpressionSchema:
       oneOf:
-      - properties:
-          Literal:
-            format: int64
-            type: integer
+      - type: object
         required:
         - Literal
-        type: object
-      - properties:
-          Read:
-            $ref: '#/components/schemas/ReadTargetSchema'
+        properties:
+          Literal:
+            type: integer
+            format: int64
+      - type: object
         required:
         - Read
-        type: object
-      - properties:
-          Aggregate:
-            $ref: '#/components/schemas/AggregateExprSchema'
+        properties:
+          Read:
+            $ref: '#/components/schemas/ReadTargetSchema'
+      - type: object
         required:
         - Aggregate
-        type: object
-      - properties:
-          Operate:
-            $ref: '#/components/schemas/OperateExprSchema'
+        properties:
+          Aggregate:
+            $ref: '#/components/schemas/AggregateExprSchema'
+      - type: object
         required:
         - Operate
-        type: object
-      - properties:
-          Choose:
-            $ref: '#/components/schemas/ChooseExprSchema'
+        properties:
+          Operate:
+            $ref: '#/components/schemas/OperateExprSchema'
+      - type: object
         required:
         - Choose
-        type: object
+        properties:
+          Choose:
+            $ref: '#/components/schemas/ChooseExprSchema'
     ScheduleFlowCandidateDefinitionSchema:
-      properties:
-        outputs:
-          items:
-            $ref: '#/components/schemas/ScheduleFlowOutputDefinitionSchema'
-          type: array
-        rank:
-          format: int32
-          type: integer
-        when:
-          $ref: '#/components/schemas/ConditionRefSchema'
+      type: object
       required:
       - when
       - rank
       - outputs
-      type: object
+      properties:
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduleFlowOutputDefinitionSchema'
+        rank:
+          type: integer
+          format: int32
+        when:
+          $ref: '#/components/schemas/ConditionRefSchema'
     ScheduleFlowOutputDefinitionSchema:
       oneOf:
-      - properties:
-          ProposeNewPlanPlacement:
-            $ref: '#/components/schemas/NewPlanProposalDefinitionSchema'
+      - type: object
         required:
         - ProposeNewPlanPlacement
-        type: object
-      - properties:
+        properties:
+          ProposeNewPlanPlacement:
+            $ref: '#/components/schemas/NewPlanProposalDefinitionSchema'
+      - type: object
+        required:
+        - ProposeNewPlanPlacementSequence
+        properties:
           ProposeNewPlanPlacementSequence:
+            type: object
+            required:
+            - proposal
+            - sequence_steps
             properties:
               proposal:
                 $ref: '#/components/schemas/NewPlanProposalDefinitionSchema'
               sequence_steps:
+                type: array
                 items:
                   $ref: '#/components/schemas/OutputSequenceStepSchema'
-                type: array
-            required:
-            - proposal
-            - sequence_steps
-            type: object
+      - type: object
         required:
-        - ProposeNewPlanPlacementSequence
-        type: object
-      - properties:
+        - ProposeChangeWithCompanions
+        properties:
           ProposeChangeWithCompanions:
+            type: object
+            required:
+            - change
+            - companions
             properties:
               change:
                 $ref: '#/components/schemas/ChangeRuleSchema'
               change_layer:
-                description: Optional for legacy clients; omitted values default to Placement (1).
-                format: int32
                 type:
                 - integer
                 - 'null'
+                format: int32
+                description: Optional for legacy clients; omitted values default to Placement (1).
               companions:
+                type: array
                 items:
                   $ref: '#/components/schemas/CompanionProposalDefinitionSchema'
-                type: array
-            required:
-            - change
-            - companions
-            type: object
-        required:
-        - ProposeChangeWithCompanions
-        type: object
     ScheduleFlowSignalSchema:
+      type: string
       enum:
       - PlacementCreated
       - PlacementUpdated
@@ -2183,29 +2954,8 @@ components:
       - ExecutionFinished
       - FactChanged
       - MetricChanged
-      type: string
     SchedulePlanDefinitionSchema:
-      properties:
-        completion:
-          $ref: '#/components/schemas/CompletionSchema'
-        decisions:
-          items:
-            $ref: '#/components/schemas/DecisionDefSchema'
-          type: array
-        metrics:
-          items:
-            $ref: '#/components/schemas/MetricDefSchema'
-          type: array
-        planning:
-          $ref: '#/components/schemas/SchedulePlanningDefinitionSchema'
-        references:
-          items:
-            $ref: '#/components/schemas/ReferenceDefSchema'
-          type: array
-        role:
-          description: Numeric `PlanRole` registry value.
-          format: int32
-          type: integer
+      type: object
       required:
       - role
       - references
@@ -2213,22 +2963,45 @@ components:
       - planning
       - metrics
       - decisions
-      type: object
-    SchedulePlanningDefinitionSchema:
       properties:
-        nesting_rules:
-          items:
-            $ref: '#/components/schemas/NestingRuleSchema'
+        completion:
+          $ref: '#/components/schemas/CompletionSchema'
+        decisions:
           type: array
-        placement_rules:
           items:
-            $ref: '#/components/schemas/PlacementRuleSchema'
+            $ref: '#/components/schemas/DecisionDefSchema'
+        metrics:
           type: array
+          items:
+            $ref: '#/components/schemas/MetricDefSchema'
+        planning:
+          $ref: '#/components/schemas/SchedulePlanningDefinitionSchema'
+        references:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceDefSchema'
+        role:
+          type: integer
+          format: int32
+          description: Numeric `PlanRole` registry value.
+    SchedulePlanningDefinitionSchema:
+      type: object
       required:
       - placement_rules
       - nesting_rules
-      type: object
+      properties:
+        nesting_rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/NestingRuleSchema'
+        placement_rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlacementRuleSchema'
     ScheduleTileDefinitionSchema:
+      type: object
+      required:
+      - title
       properties:
         color:
           type:
@@ -2248,134 +3021,104 @@ components:
           - 'null'
         title:
           type: string
-      required:
-      - title
-      type: object
     ScopeSchema:
+      type: object
+      required:
+      - kind
       properties:
         gap:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/GapAnchorsSchema'
         kind:
-          description: Numeric `ScopeKind` registry value.
-          format: int32
           type: integer
+          format: int32
+          description: Numeric `ScopeKind` registry value.
         parent:
-          format: uuid
           type:
           - string
           - 'null'
-      required:
-      - kind
-      type: object
+          format: uuid
     SelectionOrderingSchema:
-      properties:
-        direction:
-          format: int32
-          type: integer
-        point:
-          format: int32
-          type: integer
-        primary:
-          format: int32
-          type: integer
+      type: object
       required:
       - primary
       - point
       - direction
-      type: object
+      properties:
+        direction:
+          type: integer
+          format: int32
+        point:
+          type: integer
+          format: int32
+        primary:
+          type: integer
+          format: int32
     SourceGenerationSchema:
+      type: object
+      required:
+      - kind
       properties:
         at:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         date_range_end:
+          type:
+          - string
+          - 'null'
           description: Exclusive ISO-8601 calendar date upper bound.
-          type:
-          - string
-          - 'null'
         date_range_start:
+          type:
+          - string
+          - 'null'
           description: Inclusive ISO-8601 calendar date lower bound.
-          type:
-          - string
-          - 'null'
         ends_at:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         excluded_dates:
-          default: []
-          description: ISO-8601 calendar dates skipped by this source. Omitted defaults to no exclusions.
+          type: array
           items:
             type: string
-          type: array
+          description: ISO-8601 calendar dates skipped by this source. Omitted defaults to no exclusions.
+          default: []
         interval_ms:
-          format: int64
           type:
           - integer
           - 'null'
+          format: int64
         kind:
-          description: 0 = one-time, 1 = recurring.
-          format: int32
           type: integer
+          format: int32
+          description: 0 = one-time, 1 = recurring.
         offset_min:
+          type:
+          - integer
+          - 'null'
+          format: int32
           description: 'Explicit local calendar offset in minutes east of UTC (e.g. 540
 
             for Asia/Tokyo).  Omitted means the owner profile timezone
 
             applies; both absent means UTC.'
-          format: int32
-          type:
-          - integer
-          - 'null'
         starts_at:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         weekday_mask:
-          description: Bitmask for Monday through Sunday; omitted means every weekday.
-          format: int32
-          minimum: 0
           type:
           - integer
           - 'null'
-      required:
-      - kind
-      type: object
-    SourceOccurrenceRead:
-      properties:
-        nominal_at:
-          format: date-time
-          type: string
-        occurrence_id:
-          format: uuid
-          type: string
-        required_duration_ms:
-          format: int64
-          type: integer
-        revision:
-          format: int64
-          type: integer
-        sequence_no:
-          format: int64
-          type: integer
-        source_tile_id:
-          format: uuid
-          type: string
-        state:
           format: int32
-          type: integer
-        window_end:
-          format: date-time
-          type: string
-        window_start:
-          format: date-time
-          type: string
+          description: Bitmask for Monday through Sunday; omitted means every weekday.
+          minimum: 0
+    SourceOccurrenceRead:
+      type: object
       required:
       - occurrence_id
       - source_tile_id
@@ -2386,46 +3129,36 @@ components:
       - required_duration_ms
       - state
       - revision
-      type: object
-    SourceRelationDefinitionPayloadSchema:
       properties:
-        client_local_id:
-          format: uuid
+        nominal_at:
           type: string
-        correlation_scope:
-          format: int32
+          format: date-time
+        occurrence_id:
+          type: string
+          format: uuid
+        required_duration_ms:
           type: integer
-        duration_expression:
-          $ref: '#/components/schemas/SourceRelationDurationExpressionSchema'
-        eligible_through_revision:
           format: int64
+        revision:
           type: integer
-        kind:
-          format: int32
-          type: integer
-        lifecycle_filter:
-          format: int32
-          minimum: 0
-          type: integer
-        offset_ms:
           format: int64
+        sequence_no:
           type: integer
-        ordering:
-          $ref: '#/components/schemas/SelectionOrderingSchema'
-        point:
+          format: int64
+        source_tile_id:
+          type: string
+          format: uuid
+        state:
+          type: integer
           format: int32
-          type: integer
-        referenced_source_ref:
-          $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
-          description: May reference the operation-local source or a same-owner existing source.
-        split_policy:
-          $ref: '#/components/schemas/RelationSplitPolicySchema'
-        subject_source_ref:
-          $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
-          description: Must be a local endpoint matching the source alias in this operation.
-        summary_priority:
-          format: int32
-          type: integer
+        window_end:
+          type: string
+          format: date-time
+        window_start:
+          type: string
+          format: date-time
+    SourceRelationDefinitionPayloadSchema:
+      type: object
       required:
       - client_local_id
       - subject_source_ref
@@ -2440,148 +3173,140 @@ components:
       - lifecycle_filter
       - eligible_through_revision
       - summary_priority
-      type: object
+      properties:
+        client_local_id:
+          type: string
+          format: uuid
+        correlation_scope:
+          type: integer
+          format: int32
+        duration_expression:
+          $ref: '#/components/schemas/SourceRelationDurationExpressionSchema'
+        eligible_through_revision:
+          type: integer
+          format: int64
+        kind:
+          type: integer
+          format: int32
+        lifecycle_filter:
+          type: integer
+          format: int32
+          minimum: 0
+        offset_ms:
+          type: integer
+          format: int64
+        ordering:
+          $ref: '#/components/schemas/SelectionOrderingSchema'
+        point:
+          type: integer
+          format: int32
+        referenced_source_ref:
+          $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
+          description: May reference the operation-local source or a same-owner existing source.
+        split_policy:
+          $ref: '#/components/schemas/RelationSplitPolicySchema'
+        subject_source_ref:
+          $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
+          description: Must be a local endpoint matching the source alias in this operation.
+        summary_priority:
+          type: integer
+          format: int32
     SourceRelationDurationExpressionSchema:
       oneOf:
-      - properties:
-          duration_ms:
-            format: int64
-            type: integer
-          kind:
-            enum:
-            - fixed
-            type: string
+      - type: object
         required:
         - duration_ms
         - kind
-        type: object
-      - properties:
+        properties:
+          duration_ms:
+            type: integer
+            format: int64
           kind:
-            enum:
-            - reference_span
             type: string
-          referenced_source_ref:
-            $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
+            enum:
+            - fixed
+      - type: object
         required:
         - referenced_source_ref
         - kind
-        type: object
+        properties:
+          kind:
+            type: string
+            enum:
+            - reference_span
+          referenced_source_ref:
+            $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
     SourceRelationEndpointRefSchema:
       oneOf:
-      - properties:
-          client_local_id:
-            format: uuid
-            type: string
-          kind:
-            enum:
-            - local
-            type: string
+      - type: object
         required:
         - client_local_id
         - kind
-        type: object
-      - properties:
-          kind:
-            enum:
-            - existing
+        properties:
+          client_local_id:
             type: string
-          source_tile_id:
             format: uuid
+          kind:
             type: string
+            enum:
+            - local
+      - type: object
         required:
         - source_tile_id
         - kind
-        type: object
+        properties:
+          kind:
+            type: string
+            enum:
+            - existing
+          source_tile_id:
+            type: string
+            format: uuid
     SourceScheduleDefinitionSchema:
-      properties:
-        generation:
-          $ref: '#/components/schemas/SourceGenerationSchema'
-        priority:
-          format: int32
-          type: integer
-        required_duration_ms:
-          format: int64
-          type: integer
-        split_policy:
-          $ref: '#/components/schemas/SplitPolicySchema'
-        window:
-          $ref: '#/components/schemas/SourceWindowSchema'
+      type: object
       required:
       - required_duration_ms
       - generation
       - window
       - split_policy
       - priority
-      type: object
-    SourceTileDetailRead:
       properties:
-        occurrences:
-          items:
-            $ref: '#/components/schemas/SourceOccurrenceRead'
-          type: array
-        placements:
-          items:
-            $ref: '#/components/schemas/PlacementTileRead'
-          type: array
-        relations:
-          items:
-            $ref: '#/components/schemas/RelationDefinitionRead'
-          type: array
-        source:
-          $ref: '#/components/schemas/SourceTileRead'
+        generation:
+          $ref: '#/components/schemas/SourceGenerationSchema'
+        priority:
+          type: integer
+          format: int32
+        required_duration_ms:
+          type: integer
+          format: int64
+        split_policy:
+          $ref: '#/components/schemas/SplitPolicySchema'
+        window:
+          $ref: '#/components/schemas/SourceWindowSchema'
+    SourceTileDetailRead:
+      type: object
       required:
       - source
       - relations
       - occurrences
       - placements
-      type: object
-    SourceTileRead:
       properties:
-        color:
-          type:
-          - string
-          - 'null'
-        created_at:
-          format: date-time
-          type: string
-        description:
-          type:
-          - string
-          - 'null'
-        external_id:
-          type:
-          - string
-          - 'null'
-        icon:
-          type:
-          - string
-          - 'null'
-        owner_id:
-          format: uuid
-          type: string
-        plan_id:
-          format: uuid
-          type: string
-        plan_role:
-          format: int32
-          type: integer
-        revision:
-          format: int64
-          type: integer
-        schedule:
-          $ref: '#/components/schemas/SourceScheduleDefinitionSchema'
-        source_state:
-          description: Numeric SourceTile lifecycle state (0 ACTIVE .. 3 CANCELLED).
-          format: int32
-          type: integer
-        source_tile_id:
-          format: uuid
-          type: string
-        title:
-          type: string
-        updated_at:
-          format: date-time
-          type: string
+        occurrences:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceOccurrenceRead'
+        placements:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlacementTileRead'
+        relations:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationDefinitionRead'
+        source:
+          $ref: '#/components/schemas/SourceTileRead'
+    SourceTileRead:
+      type: object
       required:
       - source_tile_id
       - plan_id
@@ -2593,9 +3318,63 @@ components:
       - schedule
       - created_at
       - updated_at
-      type: object
+      properties:
+        color:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+        description:
+          type:
+          - string
+          - 'null'
+        external_id:
+          type:
+          - string
+          - 'null'
+        icon:
+          type:
+          - string
+          - 'null'
+        owner_id:
+          type: string
+          format: uuid
+        plan_id:
+          type: string
+          format: uuid
+        plan_role:
+          type: integer
+          format: int32
+        revision:
+          type: integer
+          format: int64
+        schedule:
+          $ref: '#/components/schemas/SourceScheduleDefinitionSchema'
+        source_state:
+          type: integer
+          format: int32
+          description: Numeric SourceTile lifecycle state (0 ACTIVE .. 3 CANCELLED).
+        source_tile_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
     SourceTileSummary:
+      type: object
       description: Mirror of `domain::read::SourceTileSummary` for utoipa schema generation.
+      required:
+      - source_state
+      - generation_kind
+      - split_kind
+      - priority
+      - required_duration_ms
+      - window_start_offset_ms
+      - window_end_offset_ms
       properties:
         color:
           type:
@@ -2606,201 +3385,195 @@ components:
           - string
           - 'null'
         generation_kind:
-          format: int32
           type: integer
+          format: int32
         icon:
           type:
           - string
           - 'null'
         priority:
-          format: int32
           type: integer
+          format: int32
         required_duration_ms:
+          type: integer
           format: int64
-          type: integer
         source_state:
-          format: int32
           type: integer
+          format: int32
         split_kind:
-          format: int32
           type: integer
-        weekday_mask:
           format: int32
+        weekday_mask:
           type:
           - integer
           - 'null'
+          format: int32
         window_end_offset_ms:
-          format: int64
           type: integer
+          format: int64
         window_start_offset_ms:
-          format: int64
           type: integer
-      required:
-      - source_state
-      - generation_kind
-      - split_kind
-      - priority
-      - required_duration_ms
-      - window_start_offset_ms
-      - window_end_offset_ms
-      type: object
+          format: int64
     SourceWindowSchema:
-      properties:
-        end_offset_ms:
-          format: int64
-          type: integer
-        start_offset_ms:
-          format: int64
-          type: integer
+      type: object
       required:
       - start_offset_ms
       - end_offset_ms
-      type: object
-    SpanSchema:
       properties:
-        end:
-          format: date-time
-          type: string
-        start:
-          format: date-time
-          type: string
+        end_offset_ms:
+          type: integer
+          format: int64
+        start_offset_ms:
+          type: integer
+          format: int64
+    SpanSchema:
+      type: object
       required:
       - start
       - end
-      type: object
-    SplitPolicySchema:
       properties:
-        kind:
-          description: 0 = unsplit, 1 = split.
-          format: int32
-          type: integer
-        max_segment_ms:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        max_segments:
-          format: int32
-          minimum: 0
-          type:
-          - integer
-          - 'null'
-        min_segment_ms:
-          format: int64
-          type:
-          - integer
-          - 'null'
+        end:
+          type: string
+          format: date-time
+        start:
+          type: string
+          format: date-time
+    SplitPolicySchema:
+      type: object
       required:
       - kind
-      type: object
+      properties:
+        kind:
+          type: integer
+          format: int32
+          description: 0 = unsplit, 1 = split.
+        max_segment_ms:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        max_segments:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          minimum: 0
+        min_segment_ms:
+          type:
+          - integer
+          - 'null'
+          format: int64
     StartExecutionPayloadSchema:
+      type: object
       description: '`payload` of `START_EXECUTION`.  The placement id also appears in the
 
         path; a mismatch is rejected with VALIDATION.'
-      properties:
-        placement_id:
-          format: uuid
-          type: string
       required:
       - placement_id
-      type: object
-    StartExecutionRequest:
       properties:
-        expected_revision:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        idempotency_key:
-          format: uuid
+        placement_id:
           type: string
-        occurred_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        owner_id:
-          description: Optional WORKSPACE owner override; must be owned by the actor.
           format: uuid
-          type:
-          - string
-          - 'null'
-        payload:
-          $ref: '#/components/schemas/StartExecutionPayloadSchema'
+    StartExecutionRequest:
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Optional WORKSPACE owner override; must be owned by the actor.
+        payload:
+          $ref: '#/components/schemas/StartExecutionPayloadSchema'
     StartupRecoveryPayloadSchema:
+      type: object
       description: '`POST /v1/prompts/startup-recovery` names the prompt in the body
 
         because it has no path parameter.'
+      required:
+      - prompt_id
+      - resolution
       properties:
         prompt_id:
-          format: uuid
           type: string
+          format: uuid
         resolution:
-          description: '`PromptResolution` — 0 ACKNOWLEDGED / 1 DISMISSED / 2 ACTION_TAKEN.'
-          format: int32
           type: integer
+          format: int32
+          description: '`PromptResolution` — 0 ACKNOWLEDGED / 1 DISMISSED / 2 ACTION_TAKEN.'
         response_note:
           type:
           - string
           - 'null'
-      required:
-      - prompt_id
-      - resolution
-      type: object
     StartupRecoveryRequest:
-      properties:
-        expected_revision:
-          format: int64
-          type:
-          - integer
-          - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
-          type:
-          - string
-          - 'null'
-        owner_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        payload:
-          $ref: '#/components/schemas/StartupRecoveryPayloadSchema'
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        payload:
+          $ref: '#/components/schemas/StartupRecoveryPayloadSchema'
     TargetRefSchema:
       oneOf:
-      - properties:
-          Placement:
-            format: uuid
-            type: string
+      - type: object
         required:
         - Placement
-        type: object
-      - properties:
-          Execution:
-            format: uuid
+        properties:
+          Placement:
             type: string
+            format: uuid
+      - type: object
         required:
         - Execution
-        type: object
-      - properties:
-          Plan:
-            format: uuid
+        properties:
+          Execution:
             type: string
+            format: uuid
+      - type: object
         required:
         - Plan
-        type: object
+        properties:
+          Plan:
+            type: string
+            format: uuid
     TaskContentSchema:
+      type: object
+      required:
+      - title
       properties:
         description:
           type:
@@ -2808,209 +3581,215 @@ components:
           - 'null'
         title:
           type: string
-      required:
-      - title
-      type: object
     TaskDefinitionSchema:
+      type: object
+      required:
+      - id
+      - content
+      - complete
+      - order
       properties:
         complete:
           $ref: '#/components/schemas/ConditionRefSchema'
         content:
           $ref: '#/components/schemas/TaskContentSchema'
         id:
-          format: uuid
           type: string
+          format: uuid
         order:
+          type: array
           items:
             $ref: '#/components/schemas/TaskOrderRuleSchema'
-          type: array
         show:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ConditionRefSchema'
-      required:
-      - id
-      - content
-      - complete
-      - order
-      type: object
     TaskOrderRuleSchema:
-      properties:
-        id:
-          format: uuid
-          type: string
-        relation:
-          description: Numeric `TaskOrderRelation` registry value.
-          format: int32
-          type: integer
-        target_task_id:
-          format: uuid
-          type: string
-        when:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ConditionRefSchema'
+      type: object
       required:
       - id
       - target_task_id
       - relation
-      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        relation:
+          type: integer
+          format: int32
+          description: Numeric `TaskOrderRelation` registry value.
+        target_task_id:
+          type: string
+          format: uuid
+        when:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ConditionRefSchema'
     TaskStateKindSchema:
+      type: string
       enum:
       - Visible
       - Marked
       - Completed
       - NotCompleted
-      type: string
     TaskTermSchema:
+      type: object
+      required:
+      - task_id
+      - state
       properties:
         state:
           $ref: '#/components/schemas/TaskStateKindSchema'
         task_id:
-          format: uuid
           type: string
-      required:
-      - task_id
-      - state
-      type: object
+          format: uuid
     TemporalView:
+      type: object
       description: Temporal window for a Tile (mirror of `domain::read::TemporalView`).
       properties:
         active_end:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         active_start:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         due_at:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         fixed_end:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         fixed_start:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         release_at:
-          format: date-time
           type:
           - string
           - 'null'
-      type: object
+          format: date-time
     TermSchema:
       oneOf:
-      - properties:
-          Calendar:
-            $ref: '#/components/schemas/CalendarTermSchema'
+      - type: object
         required:
         - Calendar
-        type: object
-      - properties:
-          Moment:
-            $ref: '#/components/schemas/MomentTermSchema'
+        properties:
+          Calendar:
+            $ref: '#/components/schemas/CalendarTermSchema'
+      - type: object
         required:
         - Moment
-        type: object
-      - properties:
-          Relation:
-            $ref: '#/components/schemas/RelationTermSchema'
+        properties:
+          Moment:
+            $ref: '#/components/schemas/MomentTermSchema'
+      - type: object
         required:
         - Relation
-        type: object
-      - properties:
-          Gap:
-            $ref: '#/components/schemas/GapTermSchema'
+        properties:
+          Relation:
+            $ref: '#/components/schemas/RelationTermSchema'
+      - type: object
         required:
         - Gap
-        type: object
-      - properties:
-          Requirement:
-            $ref: '#/components/schemas/RequirementTermSchema'
+        properties:
+          Gap:
+            $ref: '#/components/schemas/GapTermSchema'
+      - type: object
         required:
         - Requirement
-        type: object
-      - properties:
-          Task:
-            $ref: '#/components/schemas/TaskTermSchema'
+        properties:
+          Requirement:
+            $ref: '#/components/schemas/RequirementTermSchema'
+      - type: object
         required:
         - Task
-        type: object
-      - properties:
-          Fact:
-            $ref: '#/components/schemas/FactTermSchema'
+        properties:
+          Task:
+            $ref: '#/components/schemas/TaskTermSchema'
+      - type: object
         required:
         - Fact
-        type: object
-      - properties:
-          Metric:
-            $ref: '#/components/schemas/MetricTermSchema'
+        properties:
+          Fact:
+            $ref: '#/components/schemas/FactTermSchema'
+      - type: object
         required:
         - Metric
-        type: object
-      - properties:
-          Feedback:
-            $ref: '#/components/schemas/FeedbackTermSchema'
+        properties:
+          Metric:
+            $ref: '#/components/schemas/MetricTermSchema'
+      - type: object
         required:
         - Feedback
-        type: object
-      - properties:
-          Life:
-            $ref: '#/components/schemas/LifeTermSchema'
+        properties:
+          Feedback:
+            $ref: '#/components/schemas/FeedbackTermSchema'
+      - type: object
         required:
         - Life
-        type: object
+        properties:
+          Life:
+            $ref: '#/components/schemas/LifeTermSchema'
     TileListView:
+      type: object
       description: Rich tile-list view-model (mirror of `domain::read::TileListView`).
+      required:
+      - id
+      - title
+      - lifecycle
+      - worked_minutes
+      - break_minutes
+      - labels
+      - objective_mode
       properties:
         break_minutes:
-          format: int64
           type: integer
+          format: int64
         done_definition:
           type:
           - string
           - 'null'
         done_rule:
-          format: int32
           type:
           - integer
           - 'null'
+          format: int32
         id:
-          format: uuid
           type: string
+          format: uuid
         labels:
+          type: array
           items:
             type: string
-          type: array
         lifecycle:
-          format: int32
           type: integer
+          format: int32
         next_action:
           type:
           - string
           - 'null'
         objective_mode:
-          format: int32
           type: integer
+          format: int32
         plan_id:
+          type:
+          - string
+          - 'null'
           format: uuid
-          type:
-          - string
-          - 'null'
         projected_next_start_at:
-          format: date-time
           type:
           - string
           - 'null'
+          format: date-time
         recurrence:
           oneOf:
           - type: 'null'
@@ -3025,15 +3804,15 @@ components:
           - $ref: '#/components/schemas/SourceTileSummary'
             description: '`Some` for SourceTile rows (see `TileListView` mirror doc).'
         target_rest_min:
-          format: int32
           type:
           - integer
           - 'null'
+          format: int32
         target_work_min:
-          format: int32
           type:
           - integer
           - 'null'
+          format: int32
         temporal:
           oneOf:
           - type: 'null'
@@ -3041,73 +3820,69 @@ components:
         title:
           type: string
         worked_minutes:
+          type: integer
           format: int64
-          type: integer
-      required:
-      - id
-      - title
-      - lifecycle
-      - worked_minutes
-      - break_minutes
-      - labels
-      - objective_mode
-      type: object
     TimeObservationSchema:
-      properties:
-        aggregate:
-          format: int32
-          type: integer
-        quantifier:
-          format: int32
-          type:
-          - integer
-          - 'null'
-        reference:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        scope:
-          description: Numeric TimeScope/TimeSource/TimeAggregate registry values.
-          format: int32
-          type: integer
-        source:
-          format: int32
-          type: integer
+      type: object
       required:
       - scope
       - source
       - aggregate
-      type: object
-    TimeOfDaySchema:
       properties:
-        hour:
-          format: int32
-          minimum: 0
+        aggregate:
           type: integer
-        minute:
           format: int32
-          minimum: 0
-          type: integer
-        nanos:
+        quantifier:
+          type:
+          - integer
+          - 'null'
           format: int32
-          minimum: 0
+        reference:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        scope:
           type: integer
-        second:
           format: int32
-          minimum: 0
+          description: Numeric TimeScope/TimeSource/TimeAggregate registry values.
+        source:
           type: integer
+          format: int32
+    TimeOfDaySchema:
+      type: object
       required:
       - hour
       - minute
       - second
       - nanos
-      type: object
+      properties:
+        hour:
+          type: integer
+          format: int32
+          minimum: 0
+        minute:
+          type: integer
+          format: int32
+          minimum: 0
+        nanos:
+          type: integer
+          format: int32
+          minimum: 0
+        second:
+          type: integer
+          format: int32
+          minimum: 0
     TimeRequirementSchema:
+      type: object
+      required:
+      - id
+      - observation
+      - required
       properties:
         id:
-          format: uuid
           type: string
+          format: uuid
         observation:
           $ref: '#/components/schemas/TimeObservationSchema'
         preferred:
@@ -3116,806 +3891,69 @@ components:
           - $ref: '#/components/schemas/RangeI64Schema'
         required:
           $ref: '#/components/schemas/RangeI64Schema'
-      required:
-      - id
-      - observation
-      - required
-      type: object
     UpdateSourceTilePayloadSchema:
-      properties:
-        flows:
-          items:
-            $ref: '#/components/schemas/FlowDefinitionSchema'
-          type: array
-        horizon:
-          $ref: '#/components/schemas/SpanSchema'
-        plan:
-          $ref: '#/components/schemas/SchedulePlanDefinitionSchema'
-        relations:
-          items:
-            $ref: '#/components/schemas/SourceRelationDefinitionPayloadSchema'
-          type:
-          - array
-          - 'null'
-        schedule:
-          $ref: '#/components/schemas/SourceScheduleDefinitionSchema'
-        source_client_local_id:
-          format: uuid
-          type:
-          - string
-          - 'null'
-        tile:
-          $ref: '#/components/schemas/ScheduleTileDefinitionSchema'
+      type: object
       required:
       - tile
       - plan
       - flows
       - schedule
       - horizon
-      type: object
-    UpdateSourceTileRequest:
       properties:
-        expected_revision:
-          format: int64
+        flows:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlowDefinitionSchema'
+        horizon:
+          $ref: '#/components/schemas/SpanSchema'
+        plan:
+          $ref: '#/components/schemas/SchedulePlanDefinitionSchema'
+        relations:
           type:
-          - integer
+          - array
           - 'null'
-        idempotency_key:
-          format: uuid
-          type: string
-        occurred_at:
-          format: date-time
+          items:
+            $ref: '#/components/schemas/SourceRelationDefinitionPayloadSchema'
+        schedule:
+          $ref: '#/components/schemas/SourceScheduleDefinitionSchema'
+        source_client_local_id:
           type:
           - string
           - 'null'
-        payload:
-          $ref: '#/components/schemas/UpdateSourceTilePayloadSchema'
+          format: uuid
+        tile:
+          $ref: '#/components/schemas/ScheduleTileDefinitionSchema'
+    UpdateSourceTileRequest:
+      type: object
       required:
       - idempotency_key
       - payload
-      type: object
-info:
-  contact:
-    email: rebuild.up.up@gmail.com
-    name: 361do_sleep
-  description: v1 API binary per docs/v1/14. Old v0/tastile-api MUST NOT be imported here.
-  license:
-    identifier: Apache-2.0
-    name: Apache-2.0
-  title: api
-  version: 1.0.0
-openapi: 3.1.0
-paths:
-  /v1/auth/signout:
-    post:
-      operationId: signout
-      responses:
-        '204':
-          description: Credential revoked (or no credential present; idempotent)
-      tags:
-      - Auth
-  /v1/executions/{id}/finish:
-    post:
-      operationId: finish_execution
-      parameters:
-      - description: Execution id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FinishExecutionRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Execution not found or not accessible
-      tags:
-      - Execution
-  /v1/executions/{id}/pause:
-    post:
-      operationId: pause_execution
-      parameters:
-      - description: Execution id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExecutionLifecycleRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Execution not found or not accessible
-        '409':
-          description: Execution is not in a pausable state
-      tags:
-      - Execution
-  /v1/executions/{id}/resume:
-    post:
-      operationId: resume_execution
-      parameters:
-      - description: Execution id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExecutionLifecycleRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Execution not found or not accessible
-        '409':
-          description: Execution is not in a resumable state
-      tags:
-      - Execution
-  /v1/owners/{kind}/{id}:
-    delete:
-      operationId: delete_owner
-      parameters:
-      - description: 'Owner kind: 0 (USER) only; 1..4 always returns 404 (unsupported)'
-        in: path
-        name: kind
-        required: true
-        schema:
-          format: int32
-          type: integer
-      - description: Owner id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OwnerDeleteResponseSchema'
-          description: Owner tombstoned (or already tombstoned; idempotent)
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Owner not found, not accessible, or unsupported kind (1..4)
-      summary: 'Soft-tombstone one owner.  Returns the deletion timestamp and
-
-        the retention window.'
-      tags:
-      - Owner
-  /v1/owners/{kind}/{id}/export:
-    get:
-      operationId: export_owner
-      parameters:
-      - description: 'Owner kind: 0 (USER) only; 1..4 always returns 404 (unsupported)'
-        in: path
-        name: kind
-        required: true
-        schema:
-          format: int32
-          type: integer
-      - description: Owner id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      responses:
-        '200':
-          content:
-            application/x-ndjson:
-              schema:
-                type: string
-          description: 'NDJSON body: one JSON object per line, each { table, row }'
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Owner not found, not accessible, or unsupported kind (1..4)
-      summary: 'Stream all owner rows as NDJSON (`application/x-ndjson`).
-
-        Permitted for tombstoned owners too (GDPR Art.20 portability).'
-      tags:
-      - Owner
-  /v1/placements/{id}/executions:
-    post:
-      operationId: start_execution
-      parameters:
-      - description: Placement id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StartExecutionRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '400':
-          description: Path id and payload id do not match
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Placement not found or not accessible
-      tags:
-      - Execution
-  /v1/prompts:
-    post:
-      operationId: request_prompt
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RequestPromptRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response; the new id is in aggregateMeta.promptId
-        '400':
-          description: Validation error (unknown kind, subject mismatch)
-        '401':
-          description: Missing or invalid auth
-      tags:
-      - Prompt
-  /v1/prompts/pending:
-    get:
-      operationId: list_pending_prompts
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/PromptView'
-                type: array
-          description: Unresolved, unexpired prompts oldest first
-        '401':
-          description: Missing or invalid auth
-      tags:
-      - Prompt
-  /v1/prompts/startup-recovery:
-    post:
-      operationId: respond_startup_recovery
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StartupRecoveryRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Unknown prompt, or owned by someone else
-        '409':
-          description: Prompt is already resolved
-      tags:
-      - Prompt
-  /v1/prompts/{prompt_id}/resolve:
-    post:
-      operationId: resolve_prompt
-      parameters:
-      - description: Prompt id
-        in: path
-        name: prompt_id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ResolvePromptRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Unknown prompt, or owned by someone else
-        '409':
-          description: Prompt is already resolved
-      tags:
-      - Prompt
-  /v1/schedule-definitions:
-    post:
-      operationId: publish_schedule_definition
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PublishScheduleDefinitionRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '400':
-          description: Validation error
-        '401':
-          description: Missing or invalid auth
-      tags:
-      - SourceTile
-  /v1/source-tiles:
-    get:
-      operationId: list_source_tiles
-      parameters:
-      - description: Owner or delegated workspace
-        in: query
-        name: owner_id
-        required: false
-        schema:
-          format: uuid
-          type: string
-      - description: Maximum rows (1..500)
-        in: query
-        name: limit
-        required: false
-        schema:
-          format: int32
-          minimum: 0
-          type: integer
-      - description: Rows to skip
-        in: query
-        name: offset
-        required: false
-        schema:
-          format: int32
-          minimum: 0
-          type: integer
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/SourceTileRead'
-                type: array
-          description: List of SourceTiles
-        '401':
-          description: Missing or invalid auth
-      summary: List SourceTiles owned by the authenticated or queried owner.
-      tags:
-      - SourceTile
-    post:
-      operationId: create_source_tile
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateSourceTileRequest'
-        description: SourceTile command envelope
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '400':
-          description: Validation error
-        '401':
-          description: Missing or invalid auth
-      summary: Create a new SourceTile.  Server owns all aggregate ids.
-      tags:
-      - SourceTile
-  /v1/source-tiles/{id}:
-    get:
-      operationId: get_source_tile
-      parameters:
-      - description: SourceTile id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      - description: Owner or delegated workspace
-        in: query
-        name: owner_id
-        required: false
-        schema:
-          format: uuid
-          type: string
-      - description: Maximum occurrences and placements (1..500)
-        in: query
-        name: limit
-        required: false
-        schema:
-          format: int32
-          minimum: 0
-          type: integer
-      - description: Occurrences and placements to skip
-        in: query
-        name: offset
-        required: false
-        schema:
-          format: int32
-          minimum: 0
-          type: integer
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SourceTileDetailRead'
-          description: SourceTile detail
-        '404':
-          description: Not found or not accessible
-      summary: Read one SourceTile plus its occurrences and placements.
-      tags:
-      - SourceTile
-    put:
-      operationId: update_source_tile
-      parameters:
-      - description: SourceTile id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateSourceTileRequest'
-        description: SourceTile update command envelope
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '400':
-          description: Validation error
-        '404':
-          description: Not found or not accessible
-      summary: 'Replace the SourceTile schedule, occurrence set, and revision.
-
-        Preserves historical occurrences/placement identity; advances
-
-        the SourceTile revision.'
-      tags:
-      - SourceTile
-  /v1/source-tiles/{id}/cancel:
-    post:
-      operationId: cancel_source_tile
-      parameters:
-      - description: SourceTile id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CancelSourceTileRequest'
-        description: SourceTile cancel command envelope
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '400':
-          description: Validation error (e.g. invalid reason)
-        '401':
-          description: Missing or invalid auth
-        '404':
-          description: Not found or not accessible
-        '409':
-          description: Stale revision / already cancelled
-      summary: 'Cancel a SourceTile. Transitions the source from ACTIVE to
-
-        CANCELLED, emits a `v1_source_lifecycle_event` row, and closes
-
-        every source-managed (`source.kind = 4`) Placement whose span
-
-        overlaps the source''s effective horizon. Running executions on
-
-        the closed placements finish naturally; new work cannot be
-
-        dispatched against them. Idempotent on retry.'
-      tags:
-      - SourceTile
-  /v1/source-tiles/{id}/completion:
-    get:
-      operationId: get_source_tile_completion
-      parameters:
-      - description: SourceTile id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      - description: Owner or delegated workspace
-        in: query
-        name: owner_id
-        required: false
-        schema:
-          format: uuid
-          type: string
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: {}
-          description: Derived split completion
-        '404':
-          description: Not found or not accessible
-      summary: Derive per-segment and whole-occurrence completion for a SourceTile.
-      tags:
-      - SourceTile
-  /v1/source-tiles/{id}/placements:
-    get:
-      operationId: list_source_tile_placements
-      parameters:
-      - description: SourceTile id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      - description: Owner or delegated workspace
-        in: query
-        name: owner_id
-        required: false
-        schema:
-          format: uuid
-          type: string
-      - description: Maximum rows (1..500)
-        in: query
-        name: limit
-        required: false
-        schema:
-          format: int32
-          minimum: 0
-          type: integer
-      - description: Rows to skip
-        in: query
-        name: offset
-        required: false
-        schema:
-          format: int32
-          minimum: 0
-          type: integer
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/PlacementTileRead'
-                type: array
-          description: Placements
-        '404':
-          description: Not found or not accessible
-      summary: List canonical Placement rows for a SourceTile in owner scope.
-      tags:
-      - SourceTile
-  /v1/source-tiles/{id}/reflow:
-    post:
-      operationId: reflow_source_tile
-      parameters:
-      - description: SourceTile id
-        in: path
-        name: id
-        required: true
-        schema:
-          format: uuid
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ReflowSourceTileRequest'
-        description: SourceTile reflow command envelope
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandResponse'
-          description: Command response
-        '404':
-          description: Not found or not accessible
-        '422':
-          description: Detached / execution / override protects a placement
-      summary: 'Re-evaluate the SourceTile within a window.  Closes affected
-
-        auto-managed future placements and emits replacements without
-
-        touching detached / execution / placement-override rows.'
-      tags:
-      - SourceTile
-  /v1/tiles:
-    get:
-      operationId: list_tiles
-      parameters:
-      - description: 'Comma-separated list of owner_ids.  Defaults to the authenticated
-
-          owner (= Personal scope) when omitted.'
-        in: query
-        name: owner_ids
-        required: false
-        schema:
-          type: string
-        style: form
-      - in: query
-        name: limit
-        required: false
-        schema:
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
           format: int64
-          type: integer
-        style: form
-      - description: 'View bucketing.  `"by_state"` groups tiles by lifecycle.
-
-          Defaults to `"flat"` (no bucketing) for backwards compat with the
-
-          existing TileSummary-only consumers.'
-        in: query
-        name: view_mode
-        required: false
-        schema:
+        idempotency_key:
           type: string
-        style: form
-      - description: 'Optional lifecycle filter.  One of "ready" | "started" | "done" |
-
-          "closed"; maps to `TileLifecycleKind` numeric constants via
-
-          `parse_view_filters`.'
-        in: query
-        name: lifecycle
-        required: false
-        schema:
-          type: string
-        style: form
-      - description: 'Range string for `by_state` projection (e.g. "7d", "30d").  Only
-
-          used when `view_mode = "by_state"`.'
-        in: query
-        name: range
-        required: false
-        schema:
-          type: string
-        style: form
-      - description: 'Granularity string for `by_state` projection
-
-          (e.g. "no_breaks,min_0m", "important_only").'
-        in: query
-        name: granularity
-        required: false
-        schema:
-          type: string
-        style: form
-      - description: Free-text search across title / description / labels.
-        in: query
-        name: search
-        required: false
-        schema:
-          type: string
-        style: form
-      - description: 'When true, exclude tiles whose first upcoming placement is
-
-          strictly after the current instant.'
-        in: query
-        name: exclude_future
-        required: false
-        schema:
-          type: boolean
-        style: form
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/TileListView'
-                type: array
-          description: Tile list view-model
-        '401':
-          description: Unauthenticated
-        '403':
-          description: Forbidden
-      summary: 'List tiles (v1 view-model projection).  Per
-
-        docs/superpowers/plans/2026-07-07-v1-tile-list-view-model.md Task 3
-
-        the handler projects `domain::TileListView` so every Tile parameter is
-
-        reachable through the API surface (v1/14 §9).'
-      tags:
-      - Read
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/UpdateSourceTilePayloadSchema'
 tags:
-- description: Per-aggregate Read API (v1/14 §9)
-  name: Read
-- description: Authentication surface (v1/14 §11)
-  name: Auth
-- description: Owner account lifecycle (ADR-0010 §D-3)
-  name: Owner
-- description: SourceTile -> Occurrence -> PlacementTile scheduling (production core)
-  name: SourceTile
-- description: 'Execution lifecycle: start / pause / resume / finish (v1/14 §2.5)'
-  name: Execution
-- description: Server-issued prompt inbox (v1/14 §13)
-  name: Prompt
+- name: Read
+  description: Per-aggregate Read API (v1/14 §9)
+- name: Auth
+  description: Authentication surface (v1/14 §11)
+- name: Owner
+  description: Owner account lifecycle (ADR-0010 §D-3)
+- name: SourceTile
+  description: SourceTile -> Occurrence -> PlacementTile scheduling (production core)
+- name: Execution
+  description: 'Execution lifecycle: start / pause / resume / finish (v1/14 §2.5)'
+- name: Prompt
+  description: Server-issued prompt inbox (v1/14 §13)
