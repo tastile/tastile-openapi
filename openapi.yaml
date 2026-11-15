@@ -19,6 +19,45 @@ paths:
         '204':
           description: Credential revoked (or no credential present; idempotent)
       x-tastile-required-scope: none
+  /v1/candidates:
+    get:
+      tags:
+      - Read
+      summary: Open placements without an active execution (candidates).
+      operationId: list_candidates
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Candidate placements of the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandidateListResponse'
+        '401':
+          description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
   /v1/executions/{id}/finish:
     post:
       tags:
@@ -116,6 +155,51 @@ paths:
         '409':
           description: Execution is not in a resumable state
       x-tastile-required-scope: tastile.write
+  /v1/labels:
+    get:
+      tags:
+      - Read
+      summary: Distinct TIME_WINDOW annotation labels of the caller.
+      operationId: list_labels
+      parameters:
+      - name: owner_ids
+        in: query
+        description: Comma-separated owner ids; defaults to the caller
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Distinct labels ordered by label ASC
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabelListResponse'
+        '401':
+          description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
   /v1/owners/{kind}/{id}:
     delete:
       tags:
@@ -371,6 +455,45 @@ paths:
         '401':
           description: Missing or invalid auth
       x-tastile-required-scope: tastile.write
+  /v1/sessions:
+    get:
+      tags:
+      - Read
+      summary: Open decision sessions of the caller, newest first.
+      operationId: list_sessions
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Open decision sessions (created_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+        '401':
+          description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
   /v1/source-tiles:
     get:
       tags:
@@ -580,7 +703,15 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: Derive per-segment and whole-occurrence completion for a SourceTile.
+      summary: 'Derive per-segment and whole-occurrence completion for a SourceTile.
+
+        Complete-set read (v1/14 §15-4): returns every live split
+
+        occurrence of the source — no LIMIT, no paging.  Paging
+
+        parameters (`limit` / `cursor` / `offset` / `occurrence_*` /
+
+        `placement_*`) are rejected with VALIDATION.'
       operationId: get_source_tile_completion
       parameters:
       - name: id
@@ -599,12 +730,14 @@ paths:
           format: uuid
       responses:
         '200':
-          description: Derived split completion
+          description: Derived split completion for every live split occurrence (complete set, ordered by occurrence_id/split_group_id)
           content:
             application/json:
               schema: {}
         '404':
           description: Not found or not accessible
+        '422':
+          description: Paging parameters are not supported on this complete-set read
       x-tastile-required-scope: tastile.read
   /v1/source-tiles/{id}/placements:
     get:
@@ -713,6 +846,26 @@ paths:
         style: form
       - name: limit
         in: query
+        description: 'Page size 1..=1000 (default 100); out of range is rejected
+
+          (v1/14 §15-2).  Follow `next_cursor` to reach every row.'
+        required: false
+        schema:
+          type: integer
+          format: int64
+        style: form
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page (v1/14 §15).
+        required: false
+        schema:
+          type: string
+        style: form
+      - name: offset
+        in: query
+        description: 'Retired parameter.  Present only so offset requests are rejected
+
+          instead of silently returning the first page.'
         required: false
         schema:
           type: integer
@@ -776,17 +929,17 @@ paths:
         style: form
       responses:
         '200':
-          description: Tile list view-model
+          description: Tile list view-model page (v1/14 §15)
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TileListView'
+                $ref: '#/components/schemas/TileListResponse'
         '401':
           description: Unauthenticated
         '403':
           description: Forbidden
+        '422':
+          description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
 components:
   schemas:
@@ -1053,6 +1206,54 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/RequestDraftSchema'
+    CandidateListResponse:
+      type: object
+      description: Mirror of `handlers::paging::ListResponse<CandidatePlacement>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CandidatePlacementSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+    CandidatePlacementSchema:
+      type: object
+      description: Mirror of `handlers::read::CandidatePlacement`.
+      required:
+      - placement_id
+      - tile_id
+      - title
+      - priority
+      properties:
+        placement_id:
+          type: string
+          format: uuid
+        priority:
+          type: integer
+          format: int64
+        span_end:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        span_start:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        tile_id:
+          type: string
+          format: uuid
+        title:
+          type: string
     ChangeKeySchema:
       type: object
       required:
@@ -1793,6 +1994,24 @@ components:
           - 'null'
         title:
           type: string
+    LabelListResponse:
+      type: object
+      description: Mirror of `handlers::paging::ListResponse<String>` for `GET /v1/labels`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            type: string
+        next_cursor:
+          type:
+          - string
+          - 'null'
     LifeStateSchema:
       type: string
       enum:
@@ -3206,6 +3425,56 @@ components:
         primary:
           type: integer
           format: int32
+    SessionListItemSchema:
+      type: object
+      description: Mirror of `storage::session_repo::OpenSessionRow`.
+      required:
+      - id
+      - owner_id
+      - state
+      - revision
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          format: int32
+        state:
+          type: integer
+          format: int32
+          description: Numeric session state registry value (0 = OPEN).
+        updated_at:
+          type: string
+          format: date-time
+    SessionListResponse:
+      type: object
+      description: 'Mirror of `handlers::paging::ListResponse<OpenSessionRow>` for
+
+        `GET /v1/sessions`.'
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionListItemSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     SourceGenerationSchema:
       type: object
       required:
@@ -3963,6 +4232,28 @@ components:
         properties:
           Life:
             $ref: '#/components/schemas/LifeTermSchema'
+    TileListResponse:
+      type: object
+      description: 'Mirror of `handlers::paging::ListResponse<TileListView>` for
+
+        `GET /v1/tiles` (v1/14 §15-1).  `count` is the page size, not the
+
+        total; `next_cursor` is null on the last page.'
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TileListView'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     TileListView:
       type: object
       description: Rich tile-list view-model (mirror of `domain::read::TileListView`).

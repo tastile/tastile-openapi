@@ -4,6 +4,53 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.0.0 — 2026-11-16
+
+- Wire contract from `tastile-core` `release-1-1-0` @
+  `2a349aa1` (Core PR #313 / issue #307 on top of the v2.0.0 base
+  `d3146d38`).
+- 23 paths, 146 component schemas (was 20 / 140).
+- Generated from `tastile-core`'s `dump_openapi` binary at that SHA;
+  YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
+
+Breaking changes (MAJOR bump):
+
+- `GET /v1/tiles` now returns `TileListResponse`
+  (`{items, count, next_cursor}`) instead of a bare array. `limit`
+  default 500 -> 100, range 1..=1000 (out-of-range `422`, was silent
+  clamp); `offset` -> `422`; `cursor` added. Post-projection filters
+  (`lifecycle`, `search`, `exclude_future`, `range` start,
+  `owner_ids`) are applied while scanning keyset batches
+  (core #307 / PR #313).
+- `GET /v1/candidates` now returns `CandidateListResponse` envelope
+  instead of a bare array with implicit `LIMIT 500`. Ordering gains a
+  `placement_id` tiebreak (core #307 / PR #313).
+- `GET /v1/labels` now returns `LabelListResponse` envelope instead of
+  a bare array. `limit` default 200 -> 100, clamp -> `422`; ordering
+  `label ASC` via opaque text cursor (core #307 / PR #313).
+- `GET /v1/sessions` now returns `SessionListResponse` envelope instead
+  of a bare array with implicit `LIMIT 200`. Ordering
+  `created_at DESC, id DESC` (core #307 / PR #313).
+- `GET /v1/source-tiles/{id}/completion` keeps its bare-array
+  complete-set shape, but all paging parameters (`limit`, `cursor`,
+  `offset`, `occurrence_*`, `placement_*`) are now rejected `422`
+  instead of silently ignored (core #307 / PR #313).
+- Newly documented paths (previously absent from the spec):
+  `GET /v1/candidates` (`list_candidates`), `GET /v1/labels`
+  (`list_labels`), `GET /v1/sessions` (`list_sessions`).
+
+Contract clarifications (non-breaking):
+
+- Non-numeric paging params surface as axum `400` at deserialize;
+  numeric out-of-range / `offset` / corrupt or foreign cursor remain
+  `422` `VALIDATION` (v1/14 §15-2 note).
+- `/v1/tiles` `view_mode`/`granularity` are accepted but ignored;
+  `range` uses only its start bound (v1/14 §15-3 note).
+- Remaining uncontracted list surfaces (deliveries, recurring
+  instances, endpoints, access/*, api-tokens, prompts/pending,
+  schedule-reference-catalog, calendar/*) are explicitly out of §15
+  scope pending core#315 (v1/14 §15-5).
+
 ## v2.0.0 — 2026-11-16
 
 - Wire contract from `tastile-core` `release-1-1-0` @
