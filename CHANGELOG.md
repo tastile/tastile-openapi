@@ -4,6 +4,50 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v2.0.0 — 2026-11-16
+
+- Wire contract from `tastile-core` `release-1-1-0` @
+  `d3146d38305c8bc27074195c24f642ca25b02212` (Core PRs #302–#306 plus
+  the #310/#311 CI-trigger change; issues #294–#298).
+- 20 paths, 140 component schemas (was 19 / 133).
+- Generated from `tastile-core`'s `dump_openapi` binary
+  (`crates-v1/api/src/bin/dump_openapi.rs`); YAML regenerated with
+  PyYAML `sort_keys=False` to match the v1.0.1 file style.
+
+Breaking changes (MAJOR bump):
+
+- `ReflowSourceTileRequest.expected_revision` is now **required**
+  (non-null `int64`). Requests that omit it are rejected `422`;
+  a stale revision is rejected `409` (core #298 / PR #302).
+- `GET /v1/source-tiles` now returns `SourceTileListResponse`
+  (`{items, count, next_cursor}`) instead of a bare array. Supports
+  `limit` (default 100, max 1000) and an opaque `cursor`; `offset`
+  is rejected `422` (core #297 / PR #305).
+- `GET /v1/source-tiles/{id}/placements` now returns
+  `PlacementTileListResponse` (same envelope) instead of a bare array.
+- `SourceTileDetailRead.occurrences` and `.placements` are now paged
+  `{items, count, next_cursor}` objects instead of arrays. Occurrence
+  and placement cursors are independent (core #297 / PR #305).
+
+Added (backward-compatible):
+
+- `GET /v1/placements` (`list_placements`) → `PlacementListResponse`.
+- `SourceOccurrenceRead.blocked` → `SourceOccurrenceBlockedRead`
+  exposing the numeric unplaced reason (`0` INSUFFICIENT_CAPACITY,
+  `1` LIMIT_CONFLICT, `2` PRIORITY_TIE_CONFLICT),
+  `conflicting_source_tile_id`, and `blocked_at` (core #295 / PR #304).
+- `AggregateMetaSchema.unplaced_occurrences` listing occurrences that
+  could not be placed, with reasons (core #295 / PR #304).
+- `limit`/`cursor` query parameters and `422` validation responses on
+  the migrated list endpoints.
+
+Non-wire behavioral notes for consumers: same-priority conflicts now
+resolve deterministically (`priority DESC, source_tile_id ASC`) and the
+loser stays visible as a blocked occurrence; source-tile update/reflow
+is scoped to the target source so unrelated placements are preserved
+(core #294 / PR #306). Cursor pagination replaces the previous silent
+caps, so clients must follow `next_cursor` to retrieve complete lists.
+
 ## v1.0.1 — 2026-09-27
 
 - Issue #153 wire contract refresh for the 2026-09-27 production release

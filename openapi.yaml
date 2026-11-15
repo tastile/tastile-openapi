@@ -8,7 +8,7 @@ info:
   license:
     name: Apache-2.0
     identifier: Apache-2.0
-  version: 1.0.1
+  version: 1.1.0
 paths:
   /v1/auth/signout:
     post:
@@ -186,6 +186,37 @@ paths:
         '404':
           description: Owner not found, not accessible, or unsupported kind (1..4)
       x-tastile-required-scope: OwnerAdmin
+  /v1/placements:
+    get:
+      tags:
+      - Read
+      operationId: list_placements
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Placements of the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlacementListResponse'
+        '401':
+          description: Missing or invalid auth
+        '422':
+          description: Invalid cursor or page limit
+      x-tastile-required-scope: tastile.read
   /v1/placements/{id}/executions:
     post:
       tags:
@@ -356,31 +387,28 @@ paths:
           format: uuid
       - name: limit
         in: query
-        description: Maximum rows (1..500)
+        description: Page size 1..1000 (default 100); out of range is rejected
         required: false
         schema:
           type: integer
-          format: int32
-          minimum: 0
-      - name: offset
+          format: int64
+      - name: cursor
         in: query
-        description: Rows to skip
+        description: Opaque keyset cursor of the previous page
         required: false
         schema:
-          type: integer
-          format: int32
-          minimum: 0
+          type: string
       responses:
         '200':
           description: List of SourceTiles
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SourceTileRead'
+                $ref: '#/components/schemas/SourceTileListResponse'
         '401':
           description: Missing or invalid auth
+        '422':
+          description: Invalid cursor or page limit
       x-tastile-required-scope: tastile.read
     post:
       tags:
@@ -427,22 +455,32 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: limit
+      - name: occurrence_limit
         in: query
-        description: Maximum occurrences and placements (1..500)
+        description: Occurrence page size 1..1000 (default 100); out of range is rejected
         required: false
         schema:
           type: integer
-          format: int32
-          minimum: 0
-      - name: offset
+          format: int64
+      - name: occurrence_cursor
         in: query
-        description: Occurrences and placements to skip
+        description: Opaque keyset cursor of the occurrence collection
+        required: false
+        schema:
+          type: string
+      - name: placement_limit
+        in: query
+        description: Placement page size 1..1000 (default 100); out of range is rejected
         required: false
         schema:
           type: integer
-          format: int32
-          minimum: 0
+          format: int64
+      - name: placement_cursor
+        in: query
+        description: Opaque keyset cursor of the placement collection
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: SourceTile detail
@@ -452,6 +490,8 @@ paths:
                 $ref: '#/components/schemas/SourceTileDetailRead'
         '404':
           description: Not found or not accessible
+        '422':
+          description: Invalid cursor or page limit
       x-tastile-required-scope: tastile.read
     put:
       tags:
@@ -589,31 +629,28 @@ paths:
           format: uuid
       - name: limit
         in: query
-        description: Maximum rows (1..500)
+        description: Page size (1..1000, default 100)
         required: false
         schema:
           type: integer
-          format: int32
-          minimum: 0
-      - name: offset
+          format: int64
+      - name: cursor
         in: query
-        description: Rows to skip
+        description: Opaque keyset cursor of the previous page
         required: false
         schema:
-          type: integer
-          format: int32
-          minimum: 0
+          type: string
       responses:
         '200':
           description: Placements
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PlacementTileRead'
+                $ref: '#/components/schemas/PlacementTileListResponse'
         '404':
           description: Not found or not accessible
+        '422':
+          description: Invalid cursor
       x-tastile-required-scope: tastile.read
   /v1/source-tiles/{id}/reflow:
     post:
@@ -788,6 +825,7 @@ components:
       - flow_ids
       - occurrence_ids
       - placement_ids
+      - unplaced_occurrences
       properties:
         change_ids:
           type: array
@@ -849,6 +887,17 @@ components:
           - string
           - 'null'
           format: uuid
+        unplaced_occurrences:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnplacedOccurrenceSchema'
+          description: 'Source occurrences that could not be placed, with the numeric reason.
+
+            `occurrence_ids` only carries the placed ones, so this list is where
+
+            a caller learns *why* something is missing
+
+            (v1/09 §配置競合の決定規則と未配置理由, v1/14 §4).'
         window_ids:
           type: array
           items:
@@ -2107,6 +2156,88 @@ components:
           - $ref: '#/components/schemas/InsideSchema'
         span:
           $ref: '#/components/schemas/SpanSchema'
+    PlacementListItem:
+      type: object
+      description: Mirror of `handlers::read::PlacementListItem`.
+      required:
+      - placement_id
+      - tile_id
+      - title
+      - close_kind
+      - detach_kind
+      properties:
+        close_kind:
+          type: integer
+          format: int32
+        detach_kind:
+          type: integer
+          format: int32
+        occurrence_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        placement_id:
+          type: string
+          format: uuid
+        plan_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        source_tile_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        span_end:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        span_start:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        split_count:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        split_group_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        split_index:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        tile_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+    PlacementListResponse:
+      type: object
+      description: Mirror of `handlers::paging::ListResponse<PlacementListItem>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlacementListItem'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     PlacementProposalDraftSchema:
       type: object
       required:
@@ -2181,6 +2312,24 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ConditionRefSchema'
+    PlacementTileListResponse:
+      type: object
+      description: Mirror of `handlers::paging::ListResponse<PlacementTileRead>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlacementTileRead'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     PlacementTileRead:
       type: object
       required:
@@ -2500,14 +2649,16 @@ components:
     ReflowSourceTileRequest:
       type: object
       required:
+      - expected_revision
       - idempotency_key
       - payload
       properties:
         expected_revision:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
+          description: 'SourceTile revision the reflow was planned against.  Required: the
+
+            optimistic-concurrency check is skipped when it is absent.'
         idempotency_key:
           type: string
           format: uuid
@@ -3117,6 +3268,54 @@ components:
           format: int32
           description: Bitmask for Monday through Sunday; omitted means every weekday.
           minimum: 0
+    SourceOccurrenceBlockedRead:
+      type: object
+      description: 'Numeric reason and the peer that won a same-priority contest.
+
+        `reason`: 0 = INSUFFICIENT_CAPACITY, 1 = LIMIT_CONFLICT,
+
+        2 = PRIORITY_TIE_CONFLICT (v1/10 §2 — numeric constants only).'
+      required:
+      - reason
+      - required_duration_ms
+      - available_duration_ms
+      - blocked_at
+      properties:
+        available_duration_ms:
+          type: integer
+          format: int64
+        blocked_at:
+          type: string
+          format: date-time
+        conflicting_source_tile_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        reason:
+          type: integer
+          format: int32
+        required_duration_ms:
+          type: integer
+          format: int64
+    SourceOccurrenceListResponse:
+      type: object
+      description: Mirror of `handlers::paging::ListResponse<SourceOccurrenceRead>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceOccurrenceRead'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     SourceOccurrenceRead:
       type: object
       required:
@@ -3130,6 +3329,13 @@ components:
       - state
       - revision
       properties:
+        blocked:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/SourceOccurrenceBlockedRead'
+            description: 'Current placement failure, when a blocked record exists. State 1 can
+
+              also represent an explicitly closed terminal occurrence.'
         nominal_at:
           type: string
           format: date-time
@@ -3292,19 +3498,37 @@ components:
       - placements
       properties:
         occurrences:
-          type: array
-          items:
-            $ref: '#/components/schemas/SourceOccurrenceRead'
+          $ref: '#/components/schemas/SourceOccurrenceListResponse'
         placements:
-          type: array
-          items:
-            $ref: '#/components/schemas/PlacementTileRead'
+          $ref: '#/components/schemas/PlacementTileListResponse'
         relations:
           type: array
           items:
             $ref: '#/components/schemas/RelationDefinitionRead'
         source:
           $ref: '#/components/schemas/SourceTileRead'
+    SourceTileListResponse:
+      type: object
+      description: 'Mirror of `handlers::paging::ListResponse<SourceTileRead>`
+
+        (v1/14 §15-1).  `count` is the number of rows in this page and
+
+        `next_cursor` is null on the last page.'
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceTileRead'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     SourceTileRead:
       type: object
       required:
@@ -3891,6 +4115,43 @@ components:
           - $ref: '#/components/schemas/RangeI64Schema'
         required:
           $ref: '#/components/schemas/RangeI64Schema'
+    UnplacedOccurrenceSchema:
+      type: object
+      description: 'One Source occurrence the placement algorithm could not place.
+
+        `reason`: 0 = INSUFFICIENT_CAPACITY, 1 = LIMIT_CONFLICT,
+
+        2 = PRIORITY_TIE_CONFLICT (v1/10 §2 — numeric constants only).'
+      required:
+      - occurrence_id
+      - reason
+      - required_duration_ms
+      - available_duration_ms
+      - blocked_at
+      properties:
+        available_duration_ms:
+          type: integer
+          format: int64
+        blocked_at:
+          type: string
+          format: date-time
+        conflicting_source_tile_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'The peer Source that won the contested slot, when the reason is a
+
+            same-priority contest.'
+        occurrence_id:
+          type: string
+          format: uuid
+        reason:
+          type: integer
+          format: int32
+        required_duration_ms:
+          type: integer
+          format: int64
     UpdateSourceTilePayloadSchema:
       type: object
       required:
