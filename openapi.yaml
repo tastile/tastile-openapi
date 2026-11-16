@@ -2244,6 +2244,36 @@ components:
           description: Numeric `PointReference` registry value.
         target:
           $ref: '#/components/schemas/MomentTargetSchema'
+    MonthlyRuleSchema:
+      type: object
+      required:
+      - kind
+      properties:
+        day_of_month:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 'by_day: day of month 1..=31.  Months without the day are skipped.'
+          minimum: 0
+        kind:
+          type: integer
+          format: int32
+          description: 0 = by_day, 1 = by_weekday.
+        week_of_month:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 'by_weekday: 1..=4 = nth weekday, 5 = last weekday of the month.'
+          minimum: 0
+        weekday:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 'by_weekday: ISO weekday 1 = Monday .. 7 = Sunday.'
+          minimum: 0
     NestingRuleSchema:
       type: object
       required:
@@ -3514,7 +3544,14 @@ components:
         kind:
           type: integer
           format: int32
-          description: 0 = one-time, 1 = recurring.
+          description: 0 = one-time, 1 = recurring, 2 = demand-driven, 3 = monthly.
+        monthly_rule:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/MonthlyRuleSchema'
+            description: 'Calendar-month selector.  Required iff `kind = 3`; must be absent
+
+              for every other kind.'
         offset_min:
           type:
           - integer
