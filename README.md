@@ -58,7 +58,8 @@ bash .wslc/verify-run.sh \
      > /tmp/openapi.json'
 
 # Convert JSON to YAML (single-line `paths` to keep diffs small):
-yq -P --indent=2 /tmp/openapi.json > ../openapi/openapi.yaml
+mise exec yq@4.54.3 -- yq -P --indent=2 -o=yaml /tmp/openapi.json \
+  > ../openapi/openapi.yaml
 ```
 
 The submodule pointer must then be bumped in `tastile-root`:
