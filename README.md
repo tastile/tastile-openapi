@@ -57,8 +57,17 @@ bash .wslc/verify-run.sh \
   'cargo run --manifest-path crates-v1/Cargo.toml -p api --bin dump_openapi \
      > /tmp/openapi.json'
 
-# Convert JSON to YAML (single-line `paths` to keep diffs small):
-yq -P --indent=2 /tmp/openapi.json > ../openapi/openapi.yaml
+# Convert JSON to YAML with the established release-line formatting:
+python3 -m pip install PyYAML==6.0.3
+python3 - <<'PY' > ../openapi/openapi.yaml
+import json
+import sys
+import yaml
+
+with open('/tmp/openapi.json', encoding='utf-8') as source:
+    spec = json.load(source)
+sys.stdout.write(yaml.safe_dump(spec, sort_keys=False, allow_unicode=True, width=4096))
+PY
 ```
 
 The submodule pointer must then be bumped in `tastile-root`:
@@ -91,3 +100,5 @@ includes the bump.
 ## License
 
 Dual-licensed under MIT or Apache-2.0 at your option.
+
+See [LICENSE-MIT](./LICENSE-MIT) and [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0).
