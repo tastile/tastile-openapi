@@ -1,7 +1,8 @@
 openapi: 3.1.0
 info:
   title: api
-  description: v1 API binary per docs/v1/14. Old v0/tastile-api MUST NOT be imported here.
+  description: v1 API binary per docs/v1/14. Old v0/tastile-api MUST NOT be imported
+    here.
   contact:
     name: 361do_sleep
     email: rebuild.up.up@gmail.com
@@ -10,6 +11,220 @@ info:
     identifier: Apache-2.0
   version: 1.1.0
 paths:
+  /v1/access/grants:
+    get:
+      tags:
+      - Access
+      summary: Grants visible to the actor (as owner or grantee), newest first.
+      operationId: list_access_grants
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Grants visible to the actor (created_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessGrantListResponse'
+        '401':
+          description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
+  /v1/access/grants/pending-for-me:
+    get:
+      tags:
+      - Access
+      summary: PENDING grants where the actor is the recipient, newest first.
+      operationId: list_pending_access_grants
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Pending grants for the actor (created_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessGrantListResponse'
+        '401':
+          description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
+  /v1/access/grants/{id}/audit:
+    get:
+      tags:
+      - Access
+      summary: Audit history of one grant, most recent first.
+      operationId: list_access_grant_audit
+      parameters:
+      - name: id
+        in: path
+        description: Grant id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Audit events of the grant (occurred_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessAuditListResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Grant not found
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
+  /v1/access/notifications:
+    get:
+      tags:
+      - Access
+      summary: 'Notification inbox of the actor, newest first.  `unread_only`
+
+        filters in SQL before pagination.'
+      operationId: list_access_notifications
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: unread_only
+        in: query
+        description: When true, only unread notifications are returned
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: Notifications of the actor (created_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessNotificationListResponse'
+        '401':
+          description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
+  /v1/api-tokens:
+    get:
+      tags:
+      - Auth
+      summary: API tokens of the caller, newest first.  OwnerAdmin only.
+      operationId: list_api_tokens
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: API tokens of the caller (created_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiTokenListResponse'
+        '401':
+          description: Missing or invalid auth
+        '403':
+          description: Missing OwnerAdmin permission
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: OwnerAdmin
   /v1/auth/signout:
     post:
       tags:
@@ -55,6 +270,49 @@ paths:
                 $ref: '#/components/schemas/CandidateListResponse'
         '401':
           description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
+  /v1/endpoints:
+    get:
+      tags:
+      - Read
+      summary: 'Delivery destinations (push / web-push / email endpoints) of the
+
+        caller, newest first.'
+      operationId: list_endpoints
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Endpoints of the caller (created_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointListResponse'
+        '401':
+          description: Missing or invalid auth
+        '403':
+          description: Missing `tastile.read` scope
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
@@ -440,7 +698,8 @@ paths:
           format: int64
       responses:
         '200':
-          description: Unresolved, unexpired prompts oldest first (created_at ASC, id ASC)
+          description: Unresolved, unexpired prompts oldest first (created_at ASC,
+            id ASC)
           content:
             application/json:
               schema:
@@ -579,6 +838,57 @@ paths:
         '401':
           description: Missing or invalid auth
       x-tastile-required-scope: tastile.write
+  /v1/schedule-reference-catalog:
+    get:
+      tags:
+      - Read
+      summary: 'Schedule reference catalog for one `usage`, ordered by
+
+        `span_start ASC, placement_id ASC`.  Always scoped to the
+
+        authenticated owner; there is no owner_id query parameter.'
+      operationId: list_schedule_reference_catalog
+      parameters:
+      - name: usage
+        in: query
+        description: Required numeric schedule reference usage (1|2|3)
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Catalog items for the usage (span_start ASC, placement_id ASC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleReferenceCatalogListResponse'
+        '401':
+          description: Missing or invalid auth
+        '403':
+          description: Missing `tastile.read` scope
+        '422':
+          description: Missing/invalid usage, or invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
   /v1/sessions:
     get:
       tags:
@@ -909,7 +1219,8 @@ paths:
           format: uuid
       responses:
         '200':
-          description: Derived split completion for every live split occurrence (complete set, ordered by occurrence_id/split_group_id)
+          description: Derived split completion for every live split occurrence (complete
+            set, ordered by occurrence_id/split_group_id)
           content:
             application/json:
               schema: {}
@@ -1063,7 +1374,8 @@ paths:
         style: form
       - name: lifecycle
         in: query
-        description: 'Optional lifecycle filter.  One of "ready" | "started" | "done" |
+        description: 'Optional lifecycle filter.  One of "ready" | "started" | "done"
+          |
 
           "closed"; maps to `TileLifecycleKind` numeric constants via
 
@@ -1152,7 +1464,8 @@ paths:
           format: date-time
       - name: parent_placement_id
         in: query
-        description: Restrict to placements nested under this parent; returns an empty array unless `include_nested=true` is also set
+        description: Restrict to placements nested under this parent; returns an empty
+          array unless `include_nested=true` is also set
         required: false
         schema:
           type: string
@@ -1197,7 +1510,8 @@ paths:
           minimum: 0
       - name: offset
         in: query
-        description: Row offset applied independently of `limit`; omitted means offset 0
+        description: Row offset applied independently of `limit`; omitted means offset
+          0
         required: false
         schema:
           type: integer
@@ -1205,7 +1519,8 @@ paths:
           minimum: 0
       - name: summary
         in: query
-        description: '`month` collapses overlapping relation-derived items into one representative per relation component'
+        description: '`month` collapses overlapping relation-derived items into one
+          representative per relation component'
         required: false
         schema:
           type: string
@@ -1231,7 +1546,8 @@ paths:
           type: string
       responses:
         '200':
-          description: Timeline items in range (span.start ASC, placement_id ASC); bare JSON array
+          description: Timeline items in range (span.start ASC, placement_id ASC);
+            bare JSON array
           content:
             application/json:
               schema:
@@ -1239,14 +1555,236 @@ paths:
                 items:
                   $ref: '#/components/schemas/TimelineItemSchema'
         '400':
-          description: Malformed or missing query parameter, `start` not before `end`, or window over 31 days
+          description: Malformed or missing query parameter, `start` not before `end`,
+            or window over 31 days
         '401':
           description: Missing or invalid auth
         '403':
-          description: Missing `tastile.read` scope, or `owner_ids` names a subject the caller cannot read
+          description: Missing `tastile.read` scope, or `owner_ids` names a subject
+            the caller cannot read
       x-tastile-required-scope: tastile.read
 components:
   schemas:
+    AccessAuditEventSchema:
+      type: object
+      description: Mirror of `storage::access_repo::AuditEventRow`.
+      required:
+      - id
+      - action
+      - target_kind
+      - occurred_at
+      properties:
+        action:
+          type: integer
+          format: int32
+          description: Numeric audit action registry value.
+        actor_subject_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        detail_subject_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        grant_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+        target_kind:
+          type: integer
+          format: int32
+        target_resource_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        target_resource_kind:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        target_subject_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    AccessAuditListResponse:
+      type: object
+      description: Mirror of `handlers::access::ListResponse<AuditEventRow>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessAuditEventSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+    AccessGrantListResponse:
+      type: object
+      description: Mirror of `handlers::access::ListResponse<GrantRow>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessGrantSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+    AccessGrantSchema:
+      type: object
+      description: 'Mirror of `storage::access_repo::GrantRow` for the access grant
+
+        lists.  `resource_kind` / `status` / `initiated_by` are numeric
+
+        registry constants.'
+      required:
+      - id
+      - resource_subject_id
+      - grantee_subject_id
+      - resource_kind
+      - resource_id
+      - initiated_by
+      - status
+      - created_at
+      - updated_at
+      - capability_codes
+      properties:
+        capability_codes:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        grantee_subject_id:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        initiated_by:
+          type: integer
+          format: int32
+        message:
+          type:
+          - string
+          - 'null'
+        resolved_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        resource_id:
+          type: string
+          format: uuid
+        resource_kind:
+          type: integer
+          format: int32
+        resource_subject_id:
+          type: string
+          format: uuid
+        revoked_reason:
+          type:
+          - string
+          - 'null'
+        status:
+          type: integer
+          format: int32
+        updated_at:
+          type: string
+          format: date-time
+    AccessNotificationListResponse:
+      type: object
+      description: Mirror of `handlers::access::ListResponse<NotificationRow>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessNotificationSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+    AccessNotificationSchema:
+      type: object
+      description: Mirror of `storage::access_repo::NotificationRow`.
+      required:
+      - id
+      - recipient_subject_id
+      - kind
+      - created_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        grant_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+          description: Numeric notification kind registry value.
+        message:
+          type:
+          - string
+          - 'null'
+        read_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        recipient_subject_id:
+          type: string
+          format: uuid
+        resource_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        resource_kind:
+          type:
+          - integer
+          - 'null'
+          format: int32
     AggregateExprSchema:
       type: object
       required:
@@ -1324,7 +1862,8 @@ components:
           - string
           - 'null'
           format: uuid
-          description: 'Id of a Prompt created by `RequestPrompt`.  A Prompt is not an
+          description: 'Id of a Prompt created by `RequestPrompt`.  A Prompt is not
+            an
 
             Aggregate, so it has no `AggregateRef` and no revision; this is the
 
@@ -1348,7 +1887,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UnplacedOccurrenceSchema'
-          description: 'Source occurrences that could not be placed, with the numeric reason.
+          description: 'Source occurrences that could not be placed, with the numeric
+            reason.
 
             `occurrence_ids` only carries the placed ones, so this list is where
 
@@ -1384,7 +1924,8 @@ components:
           $ref: '#/components/schemas/ConditionRefSchema'
     ApiTokenCreateRequestSchema:
       type: object
-      description: '`POST /v1/api-tokens` request body (ADR-0010 §D-1.1 + Issue #153 §A.1/A.2).
+      description: '`POST /v1/api-tokens` request body (ADR-0010 §D-1.1 + Issue #153
+        §A.1/A.2).
 
         `expires_at` is required at the wire level — server-side validation
 
@@ -1419,6 +1960,63 @@ components:
             while authenticated as a `BearerToken` returns 400
 
             `scopes_required`.'
+    ApiTokenListResponse:
+      type: object
+      description: Mirror of `handlers::paging::ListResponse<ApiTokenView>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApiTokenViewSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+    ApiTokenViewSchema:
+      type: object
+      description: 'Mirror of `handlers::auth::ApiTokenView` for `GET /v1/api-tokens`.
+
+        `scopes` is the space-separated scope list stored on the token.'
+      required:
+      - id
+      - label
+      - prefix
+      - scopes
+      - created_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        prefix:
+          type: string
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        scopes:
+          type: string
     CalendarTermSchema:
       type: object
       required:
@@ -2039,9 +2637,70 @@ components:
     EmptyPayloadSchema:
       type: object
       description: Placeholder for a command whose payload carries no fields.
+    EndpointCapabilitySchema:
+      type: object
+      required:
+      - supports_interaction
+      - supports_action_reply
+      properties:
+        supports_action_reply:
+          type: boolean
+        supports_interaction:
+          type: boolean
+    EndpointListResponse:
+      type: object
+      description: Mirror of `handlers::paging::ListResponse<EndpointView>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EndpointViewSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+    EndpointViewSchema:
+      type: object
+      description: 'Mirror of `handlers::endpoints::EndpointView` for `GET /v1/endpoints`.
+
+        `channel` is the numeric `EndpointChannel` constant (0 PUSH /
+
+        1 WEB_PUSH / 2 EMAIL); the token is never retrievable (v1/14 §9-10).'
+      required:
+      - id
+      - owner_id
+      - channel
+      - capability
+      - created_at
+      - updated_at
+      properties:
+        capability:
+          $ref: '#/components/schemas/EndpointCapabilitySchema'
+        channel:
+          type: integer
+          format: int32
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        updated_at:
+          type: string
+          format: date-time
     ExecutionLifecycleRequest:
       type: object
-      description: '`PAUSE_EXECUTION` / `RESUME_EXECUTION` take no payload of their own —
+      description: '`PAUSE_EXECUTION` / `RESUME_EXECUTION` take no payload of their
+        own —
 
         the execution id comes from the path, so the wire value of `payload`
 
@@ -2717,7 +3376,8 @@ components:
           - string
           - 'null'
           format: uuid
-          description: Optional per-step Plan target; omitted steps inherit the output proposal Plan.
+          description: Optional per-step Plan target; omitted steps inherit the output
+            proposal Plan.
         wait_before_ms:
           type: integer
           format: int64
@@ -3040,7 +3700,8 @@ components:
         kind:
           type: integer
           format: int32
-          description: '`AggregateKind` (0 RECURRING / 1 PLACEMENT / 2 EXECUTION / 3 SESSION / 4 SOURCE).'
+          description: '`AggregateKind` (0 RECURRING / 1 PLACEMENT / 2 EXECUTION /
+            3 SESSION / 4 SOURCE).'
     PromptView:
       type: object
       required:
@@ -3255,7 +3916,8 @@ components:
           format: int32
     RecurringInstanceListResponse:
       type: object
-      description: 'Mirror of `handlers::paging::ListResponse<RecurringInstance>` for
+      description: 'Mirror of `handlers::paging::ListResponse<RecurringInstance>`
+        for
 
         `GET /v1/recurring/{id}/instances`.'
       required:
@@ -3353,7 +4015,8 @@ components:
         expected_revision:
           type: integer
           format: int64
-          description: 'SourceTile revision the reflow was planned against.  Required: the
+          description: 'SourceTile revision the reflow was planned against.  Required:
+            the
 
             optimistic-concurrency check is skipped when it is absent.'
         idempotency_key:
@@ -3787,7 +4450,8 @@ components:
                 - integer
                 - 'null'
                 format: int32
-                description: Optional for legacy clients; omitted values default to Placement (1).
+                description: Optional for legacy clients; omitted values default to
+                  Placement (1).
               companions:
                 type: array
                 items:
@@ -3846,6 +4510,60 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PlacementRuleSchema'
+    ScheduleReferenceCatalogItemSchema:
+      type: object
+      description: 'Mirror of `domain::read::ScheduleReferenceCatalogItemView` for
+
+        `GET /v1/schedule-reference-catalog`.  `role` is the numeric
+
+        `PlanRole` constant.'
+      required:
+      - placement_id
+      - tile_id
+      - plan_id
+      - title
+      - span_start
+      - span_end
+      - role
+      properties:
+        placement_id:
+          type: string
+          format: uuid
+        plan_id:
+          type: string
+          format: uuid
+        role:
+          type: integer
+          format: int32
+        span_end:
+          type: string
+          format: date-time
+        span_start:
+          type: string
+          format: date-time
+        tile_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+    ScheduleReferenceCatalogListResponse:
+      type: object
+      description: Mirror of `handlers::paging::ListResponse<ScheduleReferenceCatalogItemView>`.
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduleReferenceCatalogItemSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     ScheduleTileDefinitionSchema:
       type: object
       required:
@@ -3982,7 +4700,8 @@ components:
           type: array
           items:
             type: string
-          description: ISO-8601 calendar dates skipped by this source. Omitted defaults to no exclusions.
+          description: ISO-8601 calendar dates skipped by this source. Omitted defaults
+            to no exclusions.
           default: []
         interval_ms:
           type:
@@ -3997,7 +4716,8 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/MonthlyRuleSchema'
-            description: 'Calendar-month selector.  Required iff `kind = 3`; must be absent
+            description: 'Calendar-month selector.  Required iff `kind = 3`; must
+              be absent
 
               for every other kind.'
         offset_min:
@@ -4005,7 +4725,8 @@ components:
           - integer
           - 'null'
           format: int32
-          description: 'Explicit local calendar offset in minutes east of UTC (e.g. 540
+          description: 'Explicit local calendar offset in minutes east of UTC (e.g.
+            540
 
             for Asia/Tokyo).  Omitted means the owner profile timezone
 
@@ -4087,7 +4808,8 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/SourceOccurrenceBlockedRead'
-            description: 'Current placement failure, when a blocked record exists. State 1 can
+            description: 'Current placement failure, when a blocked record exists.
+              State 1 can
 
               also represent an explicitly closed terminal occurrence.'
         nominal_at:
@@ -4162,12 +4884,14 @@ components:
           format: int32
         referenced_source_ref:
           $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
-          description: May reference the operation-local source or a same-owner existing source.
+          description: May reference the operation-local source or a same-owner existing
+            source.
         split_policy:
           $ref: '#/components/schemas/RelationSplitPolicySchema'
         subject_source_ref:
           $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
-          description: 'Must be a local endpoint matching the source alias in this operation.
+          description: 'Must be a local endpoint matching the source alias in this
+            operation.
 
             Read-back (`definition.relations[]`, v1/14 §17-2) always emits
 
@@ -4486,7 +5210,8 @@ components:
           format: int64
     StartExecutionPayloadSchema:
       type: object
-      description: '`payload` of `START_EXECUTION`.  The placement id also appears in the
+      description: '`payload` of `START_EXECUTION`.  The placement id also appears
+        in the
 
         path; a mismatch is rejected with VALIDATION.'
       required:
@@ -5067,7 +5792,8 @@ components:
           $ref: '#/components/schemas/TimelineVisualSchema'
     TimelineOwnerEmbedSchema:
       type: object
-      description: 'Mirror of `domain::read::TimelineOwnerEmbed` (v1/15 §4).  The wire
+      description: 'Mirror of `domain::read::TimelineOwnerEmbed` (v1/15 §4).  The
+        wire
 
         field is literally `ref_` because the domain struct uses that
 
@@ -5131,7 +5857,8 @@ components:
             $ref: '#/components/schemas/TimelineViolationSchema'
     TimelineSourceSchema:
       type: object
-      description: 'Mirror of `domain::read::PlacementSourceView`.  `kind` is the numeric
+      description: 'Mirror of `domain::read::PlacementSourceView`.  `kind` is the
+        numeric
 
         `PlacementSource` constant (0 MANUAL / 1 RECURRING / 2 FLOW / 3 IMPORT /
 
@@ -5218,7 +5945,8 @@ components:
           - string
           - 'null'
           format: uuid
-          description: 'The peer Source that won the contested slot, when the reason is a
+          description: 'The peer Source that won the contested slot, when the reason
+            is a
 
             same-priority contest.'
         occurrence_id:
@@ -5296,3 +6024,5 @@ tags:
   description: 'Execution lifecycle: start / pause / resume / finish (v1/14 §2.5)'
 - name: Prompt
   description: Server-issued prompt inbox (v1/14 §13)
+- name: Access
+  description: Multi-user access grants, audit, and notifications (v1/14 §9)
