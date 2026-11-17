@@ -6,7 +6,7 @@ wire format is a MAJOR bump.
 
 ## v3.1.0 — 2026-11-17
 
-- Wire contract from `tastile-core` `release-1-1-0` @ `303c63cc`
+- Wire contract from `tastile-core` `release-1-1-0` @ `28b2b3c5`
   (Core PR #327 / issue #300 plus the already-integrated monthly
   contract of core #322–#325, on top of the v3.0.0 base `0c130c5`).
 - 24 paths, 159 component schemas (was 23 / 146).

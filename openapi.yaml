@@ -973,7 +973,7 @@ paths:
           format: date-time
       - name: parent_placement_id
         in: query
-        description: Restrict to placements nested under this parent
+        description: Restrict to placements nested under this parent; returns an empty array unless `include_nested=true` is also set
         required: false
         schema:
           type: string
@@ -1018,7 +1018,7 @@ paths:
           minimum: 0
       - name: offset
         in: query
-        description: Row offset paired with `limit`; omitted means no paging
+        description: Row offset applied independently of `limit`; omitted means offset 0
         required: false
         schema:
           type: integer
@@ -1060,11 +1060,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/TimelineItemSchema'
         '400':
-          description: '`start` not before `end`, or window over 31 days'
+          description: Malformed or missing query parameter, `start` not before `end`, or window over 31 days
         '401':
           description: Missing or invalid auth
-        '422':
-          description: Malformed query parameter
+        '403':
+          description: Missing `tastile.read` scope, or `owner_ids` names a subject the caller cannot read
       x-tastile-required-scope: tastile.read
 components:
   schemas:
