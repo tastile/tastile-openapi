@@ -4,6 +4,27 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.2.0 — 2026-11-17
+
+- Wire contract from `tastile-core` `release-1-1-0` @ `ce00fab` (Core PR #329 /
+  issue #326, definition read-back for lossless CLI editing).
+- 24 paths, 160 component schemas (was 24 / 159).
+- Generated from `tastile-core`'s `dump_openapi` binary at that SHA;
+  YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
+
+Backward-compatible addition (MINOR bump):
+
+- `SourceTileDetailRead.definition` (`SourceTileDefinitionSchema`,
+  v1/14 §17): the write-shaped definition (`tile` / `plan` / `flows` /
+  `relations` / `source_client_local_id`) read back from normalized
+  persisted state. `schedule` stays on `SourceTileRead.schedule`;
+  `horizon` is never persisted and never returned; relation refs are
+  emitted as `Existing` (v1/14 §17-2). Enables merge-or-replace edits
+  (tastile-cli #12).
+- `subject_source_ref` description on relation payload schemas now
+  documents that read-back always emits `Existing` and clients must
+  rewrite to `Local` bound to a fresh `source_client_local_id`.
+
 ## v3.1.0 — 2026-11-17
 
 - Wire contract from `tastile-core` `release-1-1-0` @ `28b2b3c5`
