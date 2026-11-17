@@ -91,3 +91,5 @@ includes the bump.
 ## License
 
 Dual-licensed under MIT or Apache-2.0 at your option.
+
+See [LICENSE-MIT](./LICENSE-MIT) and [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0).
