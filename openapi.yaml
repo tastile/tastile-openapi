@@ -417,17 +417,38 @@ paths:
       tags:
       - Prompt
       operationId: list_pending_prompts
+      parameters:
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
       responses:
         '200':
-          description: Unresolved, unexpired prompts oldest first
+          description: Unresolved, unexpired prompts oldest first (created_at ASC, id ASC)
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PromptView'
+                $ref: '#/components/schemas/PromptListResponse'
         '401':
           description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
   /v1/prompts/startup-recovery:
     post:
@@ -487,6 +508,54 @@ paths:
         '409':
           description: Prompt is already resolved
       x-tastile-required-scope: tastile.write
+  /v1/recurring/{id}/instances:
+    get:
+      tags:
+      - Read
+      summary: Frame instances generated for one Recurring definition.
+      operationId: list_recurring_instances
+      parameters:
+      - name: id
+        in: path
+        description: Recurring id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Frame instances of the recurring (range_start ASC, id ASC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringInstanceListResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Recurring not found or not accessible
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
   /v1/schedule-definitions:
     post:
       tags:
@@ -2939,6 +3008,26 @@ components:
         start:
           type: string
           format: date-time
+    PromptListResponse:
+      type: object
+      description: 'Mirror of `handlers::paging::ListResponse<PromptView>` for
+
+        `GET /v1/prompts/pending` (v1/14 §15).'
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromptView'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     PromptSubjectSchema:
       type: object
       required:
@@ -3164,6 +3253,53 @@ components:
         window_start_min:
           type: integer
           format: int32
+    RecurringInstanceListResponse:
+      type: object
+      description: 'Mirror of `handlers::paging::ListResponse<RecurringInstance>` for
+
+        `GET /v1/recurring/{id}/instances`.'
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringInstanceSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+    RecurringInstanceSchema:
+      type: object
+      description: 'Mirror of `handlers::commands::RecurringInstance` for
+
+        `GET /v1/recurring/{id}/instances`.'
+      required:
+      - frame_id
+      - frame_rule_id
+      - range_start
+      - range_end
+      - source_revision
+      properties:
+        frame_id:
+          type: string
+          format: uuid
+        frame_rule_id:
+          type: string
+          format: uuid
+        range_end:
+          type: string
+          format: date-time
+        range_start:
+          type: string
+          format: date-time
+        source_revision:
+          type: integer
+          format: int64
     ReferenceDefSchema:
       type: object
       required:

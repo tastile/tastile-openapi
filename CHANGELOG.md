@@ -4,6 +4,33 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.4.0 — 2026-11-17
+
+- Wire contract from `tastile-core` `release-1-1-0` @ `0e89b271` (Core PRs
+  #336 / issue #333 and #337 / issue #334, list reads migrated to the
+  v1/14 §15 list contract).
+- 27 paths, 165 component schemas (was 26 / 162).
+- Generated from `tastile-core`'s `dump_openapi` binary at that SHA;
+  YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
+
+Backward-compatible additions (MINOR bump):
+
+- Newly documented path: `GET /v1/recurring/{id}/instances`
+  (`list_recurring_instances`), returning `RecurringInstanceListResponse`
+  (`items` / `count` / `next_cursor`, v1/14 §15-1) with `limit` /
+  `cursor` / `offset` query parameters.
+- `GET /v1/prompts/pending` (`list_pending_prompts`) now returns
+  `PromptListResponse` (`items` / `count` / `next_cursor`) instead of a
+  bare `PromptView` array, with the same `limit` / `cursor` / `offset`
+  parameters; `offset` is retired and any value is rejected (422).
+- New component schemas: `PromptListResponse`,
+  `RecurringInstanceListResponse`, `RecurringInstanceSchema`.
+- Note: `GET /v1/endpoints`, `/v1/api-tokens`,
+  `/v1/schedule-reference-catalog`, `/v1/access/grants*` and
+  `/v1/access/notifications` also migrated on the wire (core#334) but
+  remain undocumented in this spec — they are not registered in the
+  utoipa `paths(...)` set, unchanged from previous versions.
+
 ## v3.3.0 — 2026-11-17
 
 - Wire contract from `tastile-core` `release-1-1-0` @ `23630864` (Core PR #335 /
