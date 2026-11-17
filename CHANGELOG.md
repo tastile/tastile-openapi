@@ -4,6 +4,30 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.1.0 — 2026-11-17
+
+- Wire contract from `tastile-core` `release-1-1-0` @ `303c63cc`
+  (Core PR #327 / issue #300 on top of the v3.0.0 base `0c130c5`).
+- 24 paths, 158 component schemas (was 23 / 146).
+- Generated from `tastile-core`'s `dump_openapi` binary at that SHA;
+  YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
+
+Backward-compatible additions (MINOR bump):
+
+- Newly documented path: `GET /v1/timeline` (`get_timeline`, v1/14 §4).
+  The endpoint was already served by the API — including the
+  `include_labels` opt-in that returns the non-blocking LABEL
+  (`role = 1`) placements — but absent from the published contract, so
+  typed consumers could not call it (core #300 / PR #327).
+- New component schemas: `TimelineItemSchema` and its nested view
+  schemas (`TimelineSpanSchema`, `TimelineContentSchema`,
+  `TimelineVisualSchema`, `TimelineInsideSchema`,
+  `TimelineSourceSchema`, `TimelineChangeKeySchema`,
+  `TimelineViolationSchema`, `TimelineResolutionSchema`,
+  `TimelineOwnerRefSchema`, `TimelineOwnerProfileSchema`,
+  `TimelineOwnerEmbedSchema`). All discriminators are the stable
+  numeric constants of v1/10 §2.
+
 ## v3.0.0 — 2026-11-16
 
 - Wire contract from `tastile-core` `release-1-1-0` @

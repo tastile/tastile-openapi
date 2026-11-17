@@ -941,6 +941,131 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+  /v1/timeline:
+    get:
+      tags:
+      - Read
+      summary: Placements intersecting a required time range (v1/14 §4).
+      description: 'Returns a bare JSON array of timeline items ordered by
+
+        `span.start ASC, placement_id ASC`.  `include_labels=true` adds
+
+        the non-blocking LABEL (`role = 1`) placements; every other
+
+        `include_*` flag follows the same opt-in rule.  The window may
+
+        span at most 31 days.'
+      operationId: get_timeline
+      parameters:
+      - name: start
+        in: query
+        description: Range start (RFC 3339); required, must be before `end`
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: end
+        in: query
+        description: Range end (RFC 3339); required; window at most 31 days
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: parent_placement_id
+        in: query
+        description: Restrict to placements nested under this parent
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: include_labels
+        in: query
+        description: Include LABEL (role = 1) non-blocking periods; default false
+        required: false
+        schema:
+          type: boolean
+      - name: include_closed
+        in: query
+        description: Include CLOSED placements; default false
+        required: false
+        schema:
+          type: boolean
+      - name: include_blocked
+        in: query
+        description: Include BLOCKED placements; default false
+        required: false
+        schema:
+          type: boolean
+      - name: include_nested
+        in: query
+        description: Include placements with a non-null parent; default false
+        required: false
+        schema:
+          type: boolean
+      - name: owner_ids
+        in: query
+        description: Comma-separated owner ids; defaults to the caller
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Page size; omitted returns the complete in-range set
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: offset
+        in: query
+        description: Row offset paired with `limit`; omitted means no paging
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: summary
+        in: query
+        description: '`month` collapses overlapping relation-derived items into one representative per relation component'
+        required: false
+        schema:
+          type: string
+      - name: min_duration_ms
+        in: query
+        description: Hide placements shorter than this effective span
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: min_recurring_step_ms
+        in: query
+        description: Hide recurring placements whose cadence is at or below this step
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: exclude_source_kinds
+        in: query
+        description: Comma-separated numeric PlacementSource values to exclude
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Timeline items in range (span.start ASC, placement_id ASC); bare JSON array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimelineItemSchema'
+        '400':
+          description: '`start` not before `end`, or window over 31 days'
+        '401':
+          description: Missing or invalid auth
+        '422':
+          description: Malformed query parameter
+      x-tastile-required-scope: tastile.read
 components:
   schemas:
     AggregateExprSchema:
@@ -2244,6 +2369,39 @@ components:
           description: Numeric `PointReference` registry value.
         target:
           $ref: '#/components/schemas/MomentTargetSchema'
+    MonthlyRuleSchema:
+      type: object
+      required:
+      - kind
+      properties:
+        day_of_month:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 'by_day: day of month 1..=31.  Months without the day are skipped.'
+          maximum: 31
+          minimum: 1
+        kind:
+          type: integer
+          format: int32
+          description: 0 = by_day, 1 = by_weekday.
+        week_of_month:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 'by_weekday: 1..=4 = nth weekday, 5 = last weekday of the month.'
+          maximum: 5
+          minimum: 1
+        weekday:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 'by_weekday: ISO weekday 1 = Monday .. 7 = Sunday.'
+          maximum: 7
+          minimum: 1
     NestingRuleSchema:
       type: object
       required:
@@ -3514,7 +3672,14 @@ components:
         kind:
           type: integer
           format: int32
-          description: 0 = one-time, 1 = recurring.
+          description: 0 = one-time, 1 = recurring, 2 = demand-driven, 3 = monthly.
+        monthly_rule:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/MonthlyRuleSchema'
+            description: 'Calendar-month selector.  Required iff `kind = 3`; must be absent
+
+              for every other kind.'
         offset_min:
           type:
           - integer
@@ -4406,6 +4571,265 @@ components:
           - $ref: '#/components/schemas/RangeI64Schema'
         required:
           $ref: '#/components/schemas/RangeI64Schema'
+    TimelineChangeKeySchema:
+      type: object
+      description: 'Mirror of `domain::change_set::ChangeKey` inside a resolution
+
+        violation.  `group` is the numeric `ChangeGroup` constant.'
+      required:
+      - group
+      - part
+      properties:
+        group:
+          type: integer
+          format: int32
+        item:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        part:
+          type: integer
+          format: int32
+    TimelineContentSchema:
+      type: object
+      description: Mirror of `domain::read::TileContentView`.
+      required:
+      - title
+      properties:
+        description:
+          type:
+          - string
+          - 'null'
+        title:
+          type: string
+    TimelineInsideSchema:
+      type: object
+      description: 'Mirror of `domain::read::InsideView`.  `scope` is the numeric
+
+        `ScopeKind` constant (0 ROOT / 1 HOST / 2 GAP).'
+      required:
+      - parent
+      - scope
+      properties:
+        parent:
+          type: string
+          format: uuid
+        scope:
+          type: integer
+          format: int32
+    TimelineItemSchema:
+      type: object
+      description: 'Mirror of `handlers::timeline::TimelineItemRead`: the flattened
+
+        `domain::read::TimelineItem` plus the source-tile lineage fields.
+
+
+        `role` is the numeric `PlanRole` constant.  `role = 1` (LABEL)
+
+        placements are the non-blocking label periods of v1/14 §4: they are
+
+        excluded unless `include_labels=true` and must be rendered in a
+
+        separate lane — they never count as busy time for placement or
+
+        conflict purposes.'
+      required:
+      - placement_id
+      - revision
+      - tile_id
+      - content
+      - visual
+      - role
+      - span
+      - source
+      - resolution
+      properties:
+        content:
+          $ref: '#/components/schemas/TimelineContentSchema'
+        inside:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TimelineInsideSchema'
+        occurrence_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        owner:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TimelineOwnerEmbedSchema'
+            description: Owner profile embed; omitted when the profile lookup misses.
+        placement_id:
+          type: string
+          format: uuid
+        resolution:
+          $ref: '#/components/schemas/TimelineResolutionSchema'
+        revision:
+          type: integer
+          format: int64
+        role:
+          type: integer
+          format: int32
+          description: Numeric `PlanRole` constant (0 EXECUTABLE / 1 LABEL).
+        source:
+          $ref: '#/components/schemas/TimelineSourceSchema'
+        source_tile_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        span:
+          $ref: '#/components/schemas/TimelineSpanSchema'
+        split_count:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        split_group_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        split_index:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        tile_id:
+          type: string
+          format: uuid
+        visual:
+          $ref: '#/components/schemas/TimelineVisualSchema'
+    TimelineOwnerEmbedSchema:
+      type: object
+      description: 'Mirror of `domain::read::TimelineOwnerEmbed` (v1/15 §4).  The wire
+
+        field is literally `ref_` because the domain struct uses that
+
+        identifier; clients must read `ref_`, not `ref`.'
+      required:
+      - ref_
+      - profile
+      properties:
+        profile:
+          $ref: '#/components/schemas/TimelineOwnerProfileSchema'
+        ref_:
+          $ref: '#/components/schemas/TimelineOwnerRefSchema'
+    TimelineOwnerProfileSchema:
+      type: object
+      description: Mirror of `domain::read::OwnerProfileView`.
+      required:
+      - display_name
+      properties:
+        avatar_url:
+          type:
+          - string
+          - 'null'
+        display_name:
+          type: string
+    TimelineOwnerRefSchema:
+      type: object
+      description: Mirror of `domain::read::OwnerRef` inside the owner embed.
+      required:
+      - kind
+      - id
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+    TimelineResolutionSchema:
+      type: object
+      description: 'Mirror of `domain::read::ResolutionInfo`.  `state` is the numeric
+
+        `ResolutionState` constant (0 OPEN / 1 CLOSED / 2 BLOCKED).'
+      required:
+      - state
+      - resolved_at
+      - resolution_hash
+      - violations
+      properties:
+        resolution_hash:
+          type: string
+          format: uuid
+        resolved_at:
+          type: string
+          format: date-time
+        state:
+          type: integer
+          format: int32
+        violations:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineViolationSchema'
+    TimelineSourceSchema:
+      type: object
+      description: 'Mirror of `domain::read::PlacementSourceView`.  `kind` is the numeric
+
+        `PlacementSource` constant (0 MANUAL / 1 RECURRING / 2 FLOW / 3 IMPORT /
+
+        4 SOURCE); `detail` is an opaque diagnostic string.'
+      required:
+      - kind
+      - detail
+      properties:
+        detail:
+          type: string
+        kind:
+          type: integer
+          format: int32
+    TimelineSpanSchema:
+      type: object
+      description: Mirror of `domain::read::Span` inside a timeline item.
+      required:
+      - start
+      - end
+      properties:
+        end:
+          type: string
+          format: date-time
+        start:
+          type: string
+          format: date-time
+    TimelineViolationSchema:
+      type: object
+      description: Mirror of `domain::resolver::ResolutionViolation`.
+      required:
+      - id
+      - kind
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TimelineChangeKeySchema'
+        kind:
+          type: integer
+          format: int32
+          description: Numeric `ViolationKind` constant.
+        related_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    TimelineVisualSchema:
+      type: object
+      description: Mirror of `domain::read::TileVisualView`.
+      properties:
+        color:
+          type:
+          - string
+          - 'null'
+        icon:
+          type:
+          - string
+          - 'null'
     UnplacedOccurrenceSchema:
       type: object
       description: 'One Source occurrence the placement algorithm could not place.
