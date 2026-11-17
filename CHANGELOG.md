@@ -4,6 +4,39 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.5.0 — 2026-11-17
+
+- Wire contract from `tastile-core` `release-1-1-0` @ `d148241d` (Core PR #339 /
+  issue #338 — previously undocumented endpoints registered in the utoipa
+  `paths(...)` set; Core PR #343 / issue #340 does not change the wire
+  surface).
+- 34 paths, 178 component schemas (was 27 / 165).
+- Generated from `tastile-core`'s `dump_openapi` binary at that SHA;
+  YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
+
+Backward-compatible additions (MINOR bump — purely additive, no existing
+path or schema changed):
+
+- Newly documented paths:
+  - `GET /v1/access/grants` (`list_access_grants`)
+  - `GET /v1/access/grants/pending-for-me` (`list_pending_access_grants`)
+  - `GET /v1/access/grants/{id}/audit` (`list_access_grant_audit`)
+  - `GET /v1/access/notifications` (`list_access_notifications`)
+  - `GET /v1/api-tokens` (`list_api_tokens`)
+  - `GET /v1/endpoints` (`list_endpoints`)
+  - `GET /v1/schedule-reference-catalog` (`list_schedule_reference_catalog`)
+- These endpoints already migrated to the v1/14 §15 list contract
+  (`items` / `count` / `next_cursor` with `limit` / `cursor` / `offset`)
+  in v3.4.0's wire but were not yet documented; this release records the
+  already-live wire shape, it does not introduce a new contract.
+- New component schemas include `AccessGrantSchema`,
+  `AccessGrantListResponse`, `AccessAuditEventSchema`,
+  `AccessAuditListResponse`, `AccessNotificationSchema`,
+  `AccessNotificationListResponse`, `ApiTokenViewSchema`,
+  `ApiTokenListResponse`, `EndpointViewSchema`, `EndpointListResponse`,
+  `EndpointCapabilitySchema`, `ScheduleReferenceCatalogItemSchema`, and
+  `ScheduleReferenceCatalogListResponse`.
+
 ## v3.4.0 — 2026-11-17
 
 - Wire contract from `tastile-core` `release-1-1-0` @ `0e89b271` (Core PRs
