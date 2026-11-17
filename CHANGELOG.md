@@ -7,8 +7,9 @@ wire format is a MAJOR bump.
 ## v3.1.0 — 2026-11-17
 
 - Wire contract from `tastile-core` `release-1-1-0` @ `303c63cc`
-  (Core PR #327 / issue #300 on top of the v3.0.0 base `0c130c5`).
-- 24 paths, 158 component schemas (was 23 / 146).
+  (Core PR #327 / issue #300 plus the already-integrated monthly
+  contract of core #322–#325, on top of the v3.0.0 base `0c130c5`).
+- 24 paths, 159 component schemas (was 23 / 146).
 - Generated from `tastile-core`'s `dump_openapi` binary at that SHA;
   YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
 
@@ -27,6 +28,12 @@ Backward-compatible additions (MINOR bump):
   `TimelineOwnerRefSchema`, `TimelineOwnerProfileSchema`,
   `TimelineOwnerEmbedSchema`). All discriminators are the stable
   numeric constants of v1/10 §2.
+- Monthly source generation is now contractual (core #322–#325,
+  integrated on `release-1-1-0` but unpublished until now):
+  `SourceGenerationSchema.kind` documents `3 = monthly` and adds
+  `monthly_rule` (`MonthlyRuleSchema`, required iff `kind = 3`;
+  `kind` 0 = by_day / 1 = by_weekday with `day_of_month`,
+  `week_of_month`, `weekday` bounds).
 
 ## v3.0.0 — 2026-11-16
 
