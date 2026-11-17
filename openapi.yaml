@@ -58,6 +58,61 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+  /v1/endpoints/{id}/deliveries:
+    get:
+      tags:
+      - Read
+      summary: Deliveries routed to one endpoint, most-recent first.
+      operationId: list_endpoint_deliveries
+      parameters:
+      - name: id
+        in: path
+        description: Endpoint id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: state
+        in: query
+        description: Optional delivery state filter (0=PENDING / 1=DELIVERED / 2=FAILED)
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: Deliveries of the endpoint (created_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryListResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Endpoint not found or not owned by the caller
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
   /v1/executions/{id}/finish:
     post:
       tags:
@@ -491,6 +546,61 @@ paths:
                 $ref: '#/components/schemas/SessionListResponse'
         '401':
           description: Missing or invalid auth
+        '422':
+          description: Invalid cursor, limit, or offset
+      x-tastile-required-scope: tastile.read
+  /v1/sessions/{id}/deliveries:
+    get:
+      tags:
+      - Read
+      summary: Deliveries of one decision session, most-recent first.
+      operationId: list_session_deliveries
+      parameters:
+      - name: id
+        in: path
+        description: Decision session id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        description: Page size 1..1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: cursor
+        in: query
+        description: Opaque keyset cursor of the previous page
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: state
+        in: query
+        description: Optional delivery state filter (0=PENDING / 1=DELIVERED / 2=FAILED)
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: Deliveries of the session (created_at DESC, id DESC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryListResponse'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Session not found or not owned by the caller
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
@@ -1783,6 +1893,80 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ConditionRefSchema'
+    DeliveryListItemSchema:
+      type: object
+      description: 'Mirror of `handlers::notifications::DeliveryView` — the public
+
+        projection of a `v1_delivery` row.  `channel` / `state` are the
+
+        numeric registry values (`state`: 0=PENDING / 1=DELIVERED / 2=FAILED).'
+      required:
+      - id
+      - session_id
+      - endpoint_id
+      - channel
+      - state
+      - attempts
+      - created_at
+      - updated_at
+      properties:
+        attempts:
+          type: integer
+          format: int32
+        channel:
+          type: integer
+          format: int32
+        created_at:
+          type: string
+          format: date-time
+        delivered_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        endpoint_id:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        last_error:
+          type:
+          - string
+          - 'null'
+        session_id:
+          type: string
+          format: uuid
+        state:
+          type: integer
+          format: int32
+        updated_at:
+          type: string
+          format: date-time
+    DeliveryListResponse:
+      type: object
+      description: 'Mirror of `handlers::paging::ListResponse<DeliveryView>` for
+
+        `GET /v1/sessions/{id}/deliveries` and
+
+        `GET /v1/endpoints/{id}/deliveries` (v1/14 §15-1).  `count` is the
+
+        page size, not the total; `next_cursor` is null on the last page.'
+      required:
+      - items
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryListItemSchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     EmptyPayloadSchema:
       type: object
       description: Placeholder for a command whose payload carries no fields.

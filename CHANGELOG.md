@@ -4,6 +4,26 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.3.0 — 2026-11-17
+
+- Wire contract from `tastile-core` `release-1-1-0` @ `23630864` (Core PR #335 /
+  issue #332, delivery list reads migrated to the v1/14 §15 list contract).
+- 26 paths, 162 component schemas (was 24 / 160).
+- Generated from `tastile-core`'s `dump_openapi` binary at that SHA;
+  YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
+
+Backward-compatible additions (MINOR bump):
+
+- Newly documented paths: `GET /v1/sessions/{id}/deliveries`
+  (`list_session_deliveries`) and `GET /v1/endpoints/{id}/deliveries`
+  (`list_endpoint_deliveries`), returning `DeliveryListResponse`
+  (`items` / `count` / `next_cursor`, v1/14 §15-1) with `limit` /
+  `cursor` / `state` query parameters.
+- `offset` remains accepted on the wire shape but is retired: any value
+  is rejected by the server.
+- New component schemas: `DeliveryListItemSchema` (public projection of
+  a `v1_delivery` row) and `DeliveryListResponse`.
+
 ## v3.2.0 — 2026-11-17
 
 - Wire contract from `tastile-core` `release-1-1-0` @ `ce00fab` (Core PR #329 /
