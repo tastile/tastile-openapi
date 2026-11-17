@@ -3847,7 +3847,13 @@ components:
           $ref: '#/components/schemas/RelationSplitPolicySchema'
         subject_source_ref:
           $ref: '#/components/schemas/SourceRelationEndpointRefSchema'
-          description: Must be a local endpoint matching the source alias in this operation.
+          description: 'Must be a local endpoint matching the source alias in this operation.
+
+            Read-back (`definition.relations[]`, v1/14 §17-2) always emits
+
+            `Existing`; clients rebuilding a PUT payload must rewrite the
+
+            subject ref to `Local` bound to a fresh `source_client_local_id`.'
         summary_priority:
           type: integer
           format: int32
@@ -3923,14 +3929,51 @@ components:
           $ref: '#/components/schemas/SplitPolicySchema'
         window:
           $ref: '#/components/schemas/SourceWindowSchema'
+    SourceTileDefinitionSchema:
+      type: object
+      description: 'Mirror of `domain::SourceTileDefinition` (v1/14 §17): the
+
+        write-shaped definition returned inside the SourceTile detail read
+
+        for merge-or-replace editing.  `schedule` stays on
+
+        `SourceTileRead.schedule`, `horizon` is never persisted, and
+
+        `source_client_local_id` is always null on read-back.'
+      required:
+      - tile
+      - plan
+      - flows
+      - relations
+      properties:
+        flows:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlowDefinitionSchema'
+        plan:
+          $ref: '#/components/schemas/SchedulePlanDefinitionSchema'
+        relations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRelationDefinitionPayloadSchema'
+        source_client_local_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        tile:
+          $ref: '#/components/schemas/ScheduleTileDefinitionSchema'
     SourceTileDetailRead:
       type: object
       required:
       - source
+      - definition
       - relations
       - occurrences
       - placements
       properties:
+        definition:
+          $ref: '#/components/schemas/SourceTileDefinitionSchema'
         occurrences:
           $ref: '#/components/schemas/SourceOccurrenceListResponse'
         placements:
