@@ -6,10 +6,10 @@ wire format is a MAJOR bump.
 
 ## v3.7.0 — 2026-11-18
 
-- Wire contract from `tastile-core` branch `368` @ `baf72742` (core#368
-  command POST registrations, pending merge to `release-1-1-0` via core
-  PR #382; final SHA must be re-verified against the merge commit before
-  tagging — the derivation chain requires the released core SHA).
+- Wire contract from `tastile-core` `release-1-1-0` @ `dbdf03a8` (core#368
+  command POST registrations merged via core PR #382; verified byte-identical
+  to the earlier generation from branch `368` @ `baf72742` pre-merge — the
+  derivation chain cites the released SHA).
 - 36 paths, 196 component schemas (was 35 / 180).
 - Generated from `tastile-core`'s `dump_openapi` binary;
   YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
