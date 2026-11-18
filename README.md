@@ -43,6 +43,14 @@ envelope). MINOR increments on backward-compatible additions (new
 endpoint, new optional field). PATCH is reserved for cosmetic edits to
 this repo (no effect on generated types).
 
+The spec release version (`vX.Y.Z` tag) is **independent of the Core
+product version**. Compatibility with `tastile-core` is guaranteed by
+contract verification (byte-identical regeneration + consumer drift
+checks) and the compatibility matrix in
+[`docs/compatibility.md`](./docs/compatibility.md) — never by matching
+version numbers. `openapi.yaml` `info.version` is a third, independent
+axis (the v1 API contract version).
+
 The version is recorded in two places:
 
 - `CHANGELOG.md` — human-readable history.
