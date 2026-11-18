@@ -4,6 +4,30 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.6.0 — 2026-11-19
+
+- Wire contract from `tastile-core` `release-1-1-0` @ `58f92992` (post-#339
+  merges: core#341 cursor variant scoping, core#342 grant audit authz, and
+  test-only PRs #355/#357/#358 — none change the wire surface; the
+  `main` → `release-1-1-0` merge `2cc3694c` for PR #207 carried the
+  `patch_owner_profile` utoipa registration into the release line).
+- 35 paths, 180 component schemas (was 34 / 178).
+- Generated from `tastile-core`'s `dump_openapi` binary at that SHA;
+  YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
+
+Backward-compatible additions (MINOR bump — purely additive, verified by
+full-document diff: 0 changed paths/schemas):
+
+- Newly documented paths:
+  - `PATCH /v1/owners/{kind}/{id}/profile` (`patch_owner_profile`)
+- Newly documented schemas:
+  - `PatchOwnerProfileRequest`
+  - `OwnerProfileWriteResponse`
+
+Known remaining gap (tracked separately): `GET /v1/owners/{kind}/{id}/profile`
+is routed but has no utoipa registration, so it does not appear in this
+contract.
+
 ## v3.5.0 — 2026-11-17
 
 - Wire contract from `tastile-core` `release-1-1-0` @ `d148241d` (Core PR #339 /

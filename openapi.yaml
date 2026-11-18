@@ -583,6 +583,63 @@ paths:
         '404':
           description: Owner not found, not accessible, or unsupported kind (1..4)
       x-tastile-required-scope: OwnerAdmin
+  /v1/owners/{kind}/{id}/profile:
+    patch:
+      tags:
+      - Owner
+      summary: PATCH one owner profile (v1/14 §9-1, v1/15 §3).
+      description: '`Idempotency-Key` is mandatory: the same key with the same body
+
+        replays the original `revision`, and the same key with a
+
+        different body is `IDEMPOTENCY_KEY_REUSED` (v1/10 §4-2).'
+      operationId: patch_owner_profile
+      parameters:
+      - name: kind
+        in: path
+        description: 'Owner kind: 0 (USER) only; 1..4 returns 501'
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: id
+        in: path
+        description: Owner id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        description: UUIDv7 idempotency key (required, v1/14 §9-1)
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: Partial profile update
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchOwnerProfileRequest'
+        required: true
+      responses:
+        '200':
+          description: Updated (or replayed) profile revision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerProfileWriteResponse'
+        '400':
+          description: Missing or malformed Idempotency-Key
+        '401':
+          description: Missing or invalid auth
+        '403':
+          description: Authenticated actor is not the owner
+        '409':
+          description: Stale revision or reused idempotency key
+        '501':
+          description: Unsupported owner kind
+      x-tastile-required-scope: tastile.write
   /v1/placements:
     get:
       tags:
@@ -3405,6 +3462,53 @@ components:
         retention_until:
           type: string
           format: date-time
+    OwnerProfileWriteResponse:
+      type: object
+      description: Response body for `PATCH /v1/owners/{kind}/{id}/profile`.
+      required:
+      - kind
+      - id
+      - revision
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+        revision:
+          type: integer
+          format: int64
+    PatchOwnerProfileRequest:
+      type: object
+      description: 'Request body for `PATCH /v1/owners/{kind}/{id}/profile` (v1/14
+        §9-1).
+
+        Partial update: every field is optional and only the supplied fields
+
+        move.  `expected_revision` is the optimistic-locking precondition.'
+      properties:
+        accent_color:
+          type:
+          - string
+          - 'null'
+        avatar_url:
+          type:
+          - string
+          - 'null'
+        bio:
+          type:
+          - string
+          - 'null'
+        display_name:
+          type:
+          - string
+          - 'null'
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
     PendingWorkSchema:
       type: object
       required:
