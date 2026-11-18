@@ -6,7 +6,7 @@ wire format is a MAJOR bump.
 
 ## v3.7.0 — 2026-11-18
 
-- Wire contract from `tastile-core` `release-1-1-0` @ `dbdf03a8` (core#368
+- Wire contract from `tastile-core` `release-1-1-0` @ `1380ec30` (core#368
   command POST registrations merged via core PR #382; verified byte-identical
   to the earlier generation from branch `368` @ `baf72742` pre-merge — the
   derivation chain cites the released SHA).
