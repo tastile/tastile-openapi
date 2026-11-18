@@ -225,6 +225,36 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: OwnerAdmin
+    post:
+      tags:
+      - Auth
+      summary: 'Mint an API token.  OwnerAdmin only; `expires_at` is required at
+
+        the wire level (omitted/null is a 400 Validation error).  The raw
+
+        `token` is returned exactly once.'
+      operationId: create_api_token
+      requestBody:
+        description: CreateApiTokenRequest
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiTokenCreateRequestSchema'
+        required: true
+      responses:
+        '201':
+          description: Created token (raw token returned once)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiTokenCreatedSchema'
+        '400':
+          description: Validation error (missing expires_at, invalid scopes)
+        '401':
+          description: Missing or invalid auth
+        '403':
+          description: Missing OwnerAdmin
+      x-tastile-required-scope: OwnerAdmin
   /v1/auth/signout:
     post:
       tags:
@@ -316,6 +346,34 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+    post:
+      tags:
+      - Commands
+      summary: 'Register a delivery endpoint (push / web-push / email).  The token
+
+        is stored encrypted and never returned (v1/14 §9-10).'
+      operationId: create_endpoint
+      requestBody:
+        description: EndpointInput
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEndpointRequest'
+        required: true
+      responses:
+        '201':
+          description: Created endpoint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointViewSchema'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+        '500':
+          description: Token encryption failure
+      x-tastile-required-scope: tastile.write
   /v1/endpoints/{id}/deliveries:
     get:
       tags:
@@ -584,6 +642,44 @@ paths:
           description: Owner not found, not accessible, or unsupported kind (1..4)
       x-tastile-required-scope: OwnerAdmin
   /v1/owners/{kind}/{id}/profile:
+    get:
+      tags:
+      - Owner
+      summary: Read one owner profile (v1/15 §3).
+      description: 'The response is a credential-dependent projection: without a
+
+        valid credential only `kind`/`id`/`display_name`/`avatar_url`
+
+        are returned; `bio`, `accent_color`, and `revision` are added
+
+        for authenticated callers.'
+      operationId: get_owner_profile
+      parameters:
+      - name: kind
+        in: path
+        description: 'Owner kind: 0 (USER) only; 1..4 returns 501'
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: id
+        in: path
+        description: Owner id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Owner profile projection (public or authenticated)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerProfileReadResponse'
+        '404':
+          description: Owner not found
+        '501':
+          description: Unsupported owner kind
     patch:
       tags:
       - Owner
@@ -671,6 +767,34 @@ paths:
         '422':
           description: Invalid cursor or page limit
       x-tastile-required-scope: tastile.read
+    post:
+      tags:
+      - Commands
+      summary: Create a Placement for an existing tile/plan.
+      operationId: create_placement
+      requestBody:
+        description: OwnerCommandRequest<CreatePlacementPayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlacementRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile or plan not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
   /v1/placements/{id}/executions:
     post:
       tags:
@@ -872,6 +996,42 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+  /v1/runtime/paths:
+    get:
+      tags:
+      - Runtime
+      summary: List all runtime path entries for the caller's owner.
+      operationId: list_runtime_paths
+      responses:
+        '200':
+          description: All runtime path entries for the owner
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RuntimePathRowSchema'
+        '401':
+          description: Missing or invalid auth
+      x-tastile-required-scope: tastile.read
+    post:
+      tags:
+      - Runtime
+      summary: Upsert one runtime path entry for the caller's owner.
+      operationId: upsert_runtime_path
+      requestBody:
+        description: Path entry to upsert
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimePathUpsertSchema'
+        required: true
+      responses:
+        '204':
+          description: Entry upserted
+        '401':
+          description: Missing or invalid auth
+      x-tastile-required-scope: tastile.write
   /v1/schedule-definitions:
     post:
       tags:
@@ -985,6 +1145,34 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+    post:
+      tags:
+      - Commands
+      summary: 'Create a Decision Session from evaluated decision runs and an
+
+        interaction tree (v1/06).'
+      operationId: create_session
+      requestBody:
+        description: CommandRequest<CreateSessionPayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
   /v1/sessions/{id}/deliveries:
     get:
       tags:
@@ -1040,6 +1228,44 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+    post:
+      tags:
+      - Commands
+      summary: 'Enqueue a delivery of a session to an endpoint.  The payload
+
+        `session_id` must equal the `{id}` path parameter.'
+      operationId: enqueue_delivery
+      parameters:
+      - name: id
+        in: path
+        description: Session id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<EnqueueDeliveryPayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnqueueDeliveryRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Session or endpoint not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
   /v1/source-tiles:
     get:
       tags:
@@ -1489,6 +1715,38 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+    post:
+      tags:
+      - Commands
+      summary: 'Create a Tile.  `kind = 0` (RECURRING) is rejected with 410 —
+
+        recurring creation goes through `/v1/source-tiles`; `frame_rule`
+
+        must be absent for accepted kinds.'
+      operationId: create_tile
+      requestBody:
+        description: OwnerCommandRequest<CreateTilePayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+        '409':
+          description: Stale revision or reused idempotency key
+        '410':
+          description: kind=RECURRING rejected; use /v1/source-tiles
+      x-tastile-required-scope: tastile.write
   /v1/timeline:
     get:
       tags:
@@ -2017,6 +2275,38 @@ components:
             while authenticated as a `BearerToken` returns 400
 
             `scopes_required`.'
+    ApiTokenCreatedSchema:
+      type: object
+      description: '`POST /v1/api-tokens` response (`handlers::auth::ApiTokenCreatedView`).
+
+        `token` is the raw credential — returned exactly once at creation.'
+      required:
+      - id
+      - label
+      - prefix
+      - scopes
+      - token
+      - created_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        prefix:
+          type: string
+        scopes:
+          type: string
+        token:
+          type: string
     ApiTokenListResponse:
       type: object
       description: Mirror of `handlers::paging::ListResponse<ApiTokenView>`.
@@ -2502,6 +2792,131 @@ components:
         properties:
           Term:
             $ref: '#/components/schemas/TermSchema'
+    CreateEndpointRequest:
+      type: object
+      description: '`POST /v1/endpoints` body (`handlers::endpoints::EndpointInput`).
+
+        The token is stored encrypted and is never retrievable afterwards
+
+        (v1/14 §9-10).'
+      required:
+      - channel
+      - token
+      - capability
+      properties:
+        capability:
+          $ref: '#/components/schemas/EndpointCapabilitySchema'
+        channel:
+          type: integer
+          format: int32
+          description: 'Numeric `EndpointChannel` registry value (0 PUSH / 1 WEB_PUSH
+            /
+
+            2 EMAIL).'
+        token:
+          type: string
+    CreatePlacementPayloadSchema:
+      type: object
+      description: '`payload` of `CREATE_PLACEMENT`
+
+        (`domain::command::CreatePlacementPayload`).'
+      required:
+      - tile_id
+      - plan_id
+      - source
+      - source_ref
+      - baseline
+      properties:
+        baseline:
+          $ref: '#/components/schemas/PlacementBaselineSchema'
+        plan_id:
+          type: string
+          format: uuid
+        source:
+          type: integer
+          format: int32
+          description: 'Numeric `PlacementSource` registry value (0 MANUAL / 1 RECURRING
+            /
+
+            2 FLOW / 3 IMPORT / 4 SOURCE).'
+        source_ref:
+          $ref: '#/components/schemas/PlacementSourceRefSchema'
+        tile_id:
+          type: string
+          format: uuid
+    CreatePlacementRequest:
+      type: object
+      description: '`POST /v1/placements` body: `OwnerCommandRequest<CreatePlacementPayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Optional WORKSPACE owner override; must be owned by the actor.
+        payload:
+          $ref: '#/components/schemas/CreatePlacementPayloadSchema'
+    CreateSessionPayloadSchema:
+      type: object
+      description: '`payload` of `CREATE_SESSION`
+
+        (`domain::command::CreateSessionPayload`).  `decisions` and `tree`
+
+        carry the v1/06 SessionDecisionRun / InteractionTree structures; their
+
+        full nested shape is owned by v1/06 and is transported as JSON.'
+      required:
+      - decisions
+      - tree
+      properties:
+        decisions:
+          type: array
+          items: {}
+        session_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Server-assigned when absent.
+        tree: {}
+    CreateSessionRequest:
+      type: object
+      description: '`POST /v1/sessions` body: `CommandRequest<CreateSessionPayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/CreateSessionPayloadSchema'
     CreateSourceTilePayloadSchema:
       type: object
       required:
@@ -2555,6 +2970,85 @@ components:
           format: date-time
         payload:
           $ref: '#/components/schemas/CreateSourceTilePayloadSchema'
+    CreateTilePayloadSchema:
+      type: object
+      description: '`payload` of `CREATE_TILE` (`domain::command::CreateTilePayload`).
+
+        `kind` is the numeric `TileKind` registry value (0 RECURRING /
+
+        1 PLACEMENT / 2 EXECUTION / 3 SOURCE); `plan_role` is the numeric
+
+        `PlanRole` value (0 EXECUTABLE / 1 LABEL).  `kind = 0` (RECURRING) is
+
+        rejected with 410 — recurring creation goes through `/v1/source-tiles`;
+
+        `frame_rule` must be absent for every accepted kind.  Its `FrameRuleDef`
+
+        JSON shape is owned by v1/04 (generator / active /
+
+        placement_duration_ms / rank).'
+      required:
+      - kind
+      - title
+      - plan_role
+      properties:
+        color:
+          type:
+          - string
+          - 'null'
+        description:
+          type:
+          - string
+          - 'null'
+        external_id:
+          type:
+          - string
+          - 'null'
+        frame_rule: {}
+        icon:
+          type:
+          - string
+          - 'null'
+        kind:
+          type: integer
+          format: int32
+        meta_min:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TileMetaMinSchema'
+        plan_role:
+          type: integer
+          format: int32
+        title:
+          type: string
+    CreateTileRequest:
+      type: object
+      description: '`POST /v1/tiles` body: `OwnerCommandRequest<CreateTilePayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Optional WORKSPACE owner override; must be owned by the actor.
+        payload:
+          $ref: '#/components/schemas/CreateTilePayloadSchema'
     DateRangeSchema:
       type: object
       required:
@@ -2754,6 +3248,54 @@ components:
         updated_at:
           type: string
           format: date-time
+    EnqueueDeliveryPayloadSchema:
+      type: object
+      description: '`payload` of `ENQUEUE_DELIVERY`
+
+        (`domain::command::EnqueueDeliveryPayload`).'
+      required:
+      - session_id
+      - endpoint_id
+      - channel
+      properties:
+        channel:
+          type: integer
+          format: int32
+          description: 'Numeric `DeliveryChannel` registry value (0 WEB / 1 DESKTOP
+            /
+
+            2 MOBILE / 3 EMAIL).'
+        endpoint_id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+    EnqueueDeliveryRequest:
+      type: object
+      description: '`POST /v1/sessions/{id}/deliveries` body:
+
+        `CommandRequest<EnqueueDeliveryPayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/EnqueueDeliveryPayloadSchema'
     ExecutionLifecycleRequest:
       type: object
       description: '`PAUSE_EXECUTION` / `RESUME_EXECUTION` take no payload of their
@@ -3462,6 +4004,46 @@ components:
         retention_until:
           type: string
           format: date-time
+    OwnerProfileReadResponse:
+      type: object
+      description: 'Response body for `GET /v1/owners/{kind}/{id}/profile` (v1/15
+        §3).
+
+        Unauthenticated callers receive only the public projection
+
+        (`kind`/`id`/`display_name`/`avatar_url`); `bio`, `accent_color`,
+
+        and `revision` are present only when a valid credential is supplied.'
+      required:
+      - kind
+      - id
+      - display_name
+      properties:
+        accent_color:
+          type:
+          - string
+          - 'null'
+        avatar_url:
+          type:
+          - string
+          - 'null'
+        bio:
+          type:
+          - string
+          - 'null'
+        display_name:
+          type: string
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+        revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
     OwnerProfileWriteResponse:
       type: object
       description: Response body for `PATCH /v1/owners/{kind}/{id}/profile`.
@@ -3706,6 +4288,42 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ConditionRefSchema'
+    PlacementSourceRefSchema:
+      type: object
+      description: '`domain::aggregate::PlacementSourceRef` — provenance of a Placement.'
+      properties:
+        created:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/StampSchema'
+        external_id:
+          type:
+          - string
+          - 'null'
+        flow:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        frame:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        proposal:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProposalKeySchema'
+        recurring:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: '`VersionRef` of the owning recurring / flow / frame.'
+        source_text:
+          type:
+          - string
+          - 'null'
     PlacementTileListResponse:
       type: object
       description: Mirror of `handlers::paging::ListResponse<PlacementTileRead>`.
@@ -4462,6 +5080,32 @@ components:
           format: uuid
         payload:
           $ref: '#/components/schemas/ResolvePromptPayloadSchema'
+    RuntimePathRowSchema:
+      type: object
+      description: One row of `GET /v1/runtime/paths`.
+      required:
+      - id
+      - path
+      - updated_at
+      properties:
+        id:
+          type: string
+        path:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    RuntimePathUpsertSchema:
+      type: object
+      description: Request body for `POST /v1/runtime/paths` (upsert).
+      required:
+      - id
+      - path
+      properties:
+        id:
+          type: string
+        path:
+          type: string
     ScalarExpressionRefSchema:
       $ref: '#/components/schemas/ScalarExpressionSchema'
     ScalarExpressionSchema:
@@ -5312,6 +5956,31 @@ components:
           - integer
           - 'null'
           format: int64
+    StampSchema:
+      type: object
+      description: '`domain::common::Stamp` — who/when/which-command produced a value.'
+      required:
+      - at
+      - actor
+      - actor_kind
+      - command_id
+      properties:
+        actor:
+          type: string
+          format: uuid
+        actor_kind:
+          type: integer
+          format: int32
+          description: 'Numeric `ActorKind` registry value (0 USER / 1 WORKER / 2
+            IMPORT /
+
+            3 SYSTEM).'
+        at:
+          type: string
+          format: date-time
+        command_id:
+          type: string
+          format: uuid
     StartExecutionPayloadSchema:
       type: object
       description: '`payload` of `START_EXECUTION`.  The placement id also appears
@@ -5694,6 +6363,25 @@ components:
         worked_minutes:
           type: integer
           format: int64
+    TileMetaMinSchema:
+      type: object
+      description: '`domain::aggregate::TileMetaMin` — meta-min subset of tile metadata.'
+      required:
+      - tags
+      properties:
+        notes:
+          type:
+          - string
+          - 'null'
+        project_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        tags:
+          type: array
+          items:
+            type: string
     TimeObservationSchema:
       type: object
       required:
@@ -6130,3 +6818,6 @@ tags:
   description: Server-issued prompt inbox (v1/14 §13)
 - name: Access
   description: Multi-user access grants, audit, and notifications (v1/14 §9)
+- name: Commands
+  description: 'Domain command writes: tiles / placements / sessions / deliveries
+    / endpoints (v1/14 §9)'

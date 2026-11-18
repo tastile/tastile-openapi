@@ -4,6 +4,40 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.7.0 — 2026-11-18
+
+- Wire contract from `tastile-core` `release-1-1-0` @ `1380ec30` (core#368
+  command POST registrations merged via core PR #382; verified byte-identical
+  to the earlier generation from branch `368` @ `baf72742` pre-merge — the
+  derivation chain cites the released SHA).
+- 36 paths, 196 component schemas (was 35 / 180).
+- Generated from `tastile-core`'s `dump_openapi` binary;
+  YAML regenerated with PyYAML `sort_keys=False` (v1.0.1+ file style).
+
+Backward-compatible additions (MINOR bump — purely additive, verified by
+full-document diff: 0 changed paths/schemas, 0 removed operations):
+
+- Newly documented operations on existing paths (core#368):
+  - `POST /v1/tiles` (`create_tile`)
+  - `POST /v1/placements` (`create_placement`)
+  - `POST /v1/sessions` (`create_session`)
+  - `POST /v1/sessions/{id}/deliveries` (`enqueue_delivery`)
+  - `POST /v1/endpoints` (`create_endpoint`)
+  - `POST /v1/api-tokens` (`create_api_token`)
+- Newly documented paths/operations merged into core since v3.6.0:
+  - `GET /v1/owners/{kind}/{id}/profile` (`get_owner_profile`) — closes
+    the v3.6.0 known-gap note
+  - `GET /v1/runtime/paths`, `POST /v1/runtime/paths`
+- Newly documented schemas:
+  - `ApiTokenCreatedSchema`, `CreateEndpointRequest`,
+    `CreatePlacementPayloadSchema`, `CreatePlacementRequest`,
+    `CreateSessionPayloadSchema`, `CreateSessionRequest`,
+    `CreateTilePayloadSchema`, `CreateTileRequest`,
+    `EnqueueDeliveryPayloadSchema`, `EnqueueDeliveryRequest`,
+    `OwnerProfileReadResponse`, `PlacementSourceRefSchema`,
+    `RuntimePathRowSchema`, `RuntimePathUpsertSchema`, `StampSchema`,
+    `TileMetaMinSchema`
+
 ## v3.6.0 — 2026-11-19
 
 - Wire contract from `tastile-core` `release-1-1-0` @ `58f92992` (post-#339
