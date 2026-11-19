@@ -4,6 +4,20 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.8.1 — 2026-11-20
+
+- Wire contract from `tastile-core` `release-2-0-0` @ `0e6ecb2f` (core PR #401:
+  restore doc-comment-derived summaries, add doc comments to the 11
+  operations that lacked one).
+- Summary text only — 0 added/removed/changed operations or schemas.
+  The v3.8.0 summaries were generic replacements that overwrote richer
+  doc-comment summaries; this release restores them (e.g.
+  `list_access_grants` is again "Grants visible to the actor (as owner
+  or grantee), newest first.").
+
+PATCH (doc-metadata only; generated client types unchanged except
+comment text).
+
 ## v3.8.0 — 2026-11-20
 
 - Wire contract from `tastile-core` `release-2-0-0` @ `e8219616` (core#399 /

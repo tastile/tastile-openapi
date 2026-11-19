@@ -17,7 +17,7 @@ paths:
     get:
       tags:
       - Access
-      summary: List access grants
+      summary: Grants visible to the actor (as owner or grantee), newest first.
       operationId: list_access_grants
       parameters:
       - name: limit
@@ -56,7 +56,7 @@ paths:
     get:
       tags:
       - Access
-      summary: List pending access grants for the caller
+      summary: PENDING grants where the actor is the recipient, newest first.
       operationId: list_pending_access_grants
       parameters:
       - name: limit
@@ -95,7 +95,7 @@ paths:
     get:
       tags:
       - Access
-      summary: List access grant audit events
+      summary: Audit history of one grant, most recent first.
       operationId: list_access_grant_audit
       parameters:
       - name: id
@@ -143,7 +143,9 @@ paths:
     get:
       tags:
       - Access
-      summary: List access notifications
+      summary: 'Notification inbox of the actor, newest first.  `unread_only`
+
+        filters in SQL before pagination.'
       operationId: list_access_notifications
       parameters:
       - name: limit
@@ -188,7 +190,7 @@ paths:
     get:
       tags:
       - Auth
-      summary: List API tokens for the caller
+      summary: API tokens of the caller, newest first.  OwnerAdmin only.
       operationId: list_api_tokens
       parameters:
       - name: limit
@@ -228,7 +230,11 @@ paths:
     post:
       tags:
       - Auth
-      summary: Create an API token
+      summary: 'Mint an API token.  OwnerAdmin only; `expires_at` is required at
+
+        the wire level (omitted/null is a 400 Validation error).  The raw
+
+        `token` is returned exactly once.'
       operationId: create_api_token
       requestBody:
         description: CreateApiTokenRequest
@@ -255,7 +261,8 @@ paths:
     post:
       tags:
       - Auth
-      summary: Revoke the caller's credential (Bearer token or cookie)
+      summary: 'Revoke the caller''s credential (Bearer token or cookie). Idempotent:
+        no resolvable credential is a 204 no-op.'
       operationId: signout
       responses:
         '204':
@@ -265,7 +272,7 @@ paths:
     get:
       tags:
       - Read
-      summary: List open placements without an active execution
+      summary: Open placements without an active execution (candidates).
       operationId: list_candidates
       parameters:
       - name: limit
@@ -304,7 +311,9 @@ paths:
     get:
       tags:
       - Read
-      summary: List delivery endpoints
+      summary: 'Delivery destinations (push / web-push / email endpoints) of the
+
+        caller, newest first.'
       operationId: list_endpoints
       parameters:
       - name: limit
@@ -344,7 +353,9 @@ paths:
     post:
       tags:
       - Commands
-      summary: Create a delivery endpoint
+      summary: 'Register a delivery endpoint (push / web-push / email).  The token
+
+        is stored encrypted and never returned (v1/14 §9-10).'
       operationId: create_endpoint
       requestBody:
         description: EndpointInput
@@ -371,7 +382,7 @@ paths:
     get:
       tags:
       - Read
-      summary: List deliveries for an endpoint
+      summary: Deliveries routed to one endpoint, most-recent first.
       operationId: list_endpoint_deliveries
       parameters:
       - name: id
@@ -426,7 +437,7 @@ paths:
     post:
       tags:
       - Execution
-      summary: Finish an execution
+      summary: Finish an execution.
       operationId: finish_execution
       parameters:
       - name: id
@@ -458,7 +469,7 @@ paths:
     post:
       tags:
       - Execution
-      summary: Pause an execution
+      summary: Pause an execution.
       operationId: pause_execution
       parameters:
       - name: id
@@ -492,7 +503,7 @@ paths:
     post:
       tags:
       - Execution
-      summary: Resume an execution
+      summary: Resume an execution.
       operationId: resume_execution
       parameters:
       - name: id
@@ -526,7 +537,7 @@ paths:
     get:
       tags:
       - Read
-      summary: List labels
+      summary: Distinct TIME_WINDOW annotation labels of the caller.
       operationId: list_labels
       parameters:
       - name: owner_ids
@@ -571,7 +582,9 @@ paths:
     delete:
       tags:
       - Owner
-      summary: Delete the owner account and all owned data
+      summary: 'Soft-tombstone one owner.  Returns the deletion timestamp and
+
+        the retention window.'
       operationId: delete_owner
       parameters:
       - name: kind
@@ -604,7 +617,9 @@ paths:
     get:
       tags:
       - Owner
-      summary: Export all owner data as NDJSON
+      summary: 'Stream all owner rows as NDJSON (`application/x-ndjson`).
+
+        Permitted for tombstoned owners too (GDPR Art.20 portability).'
       operationId: export_owner
       parameters:
       - name: kind
@@ -637,7 +652,7 @@ paths:
     get:
       tags:
       - Owner
-      summary: Get the owner profile (minimal projection when unauthenticated)
+      summary: Read one owner profile (v1/15 §3).
       description: 'The response is a credential-dependent projection: without a
 
         valid credential only `kind`/`id`/`display_name`/`avatar_url`
@@ -682,7 +697,7 @@ paths:
     patch:
       tags:
       - Owner
-      summary: Update the owner profile
+      summary: PATCH one owner profile (v1/14 §9-1, v1/15 §3).
       description: '`Idempotency-Key` is mandatory: the same key with the same body
 
         replays the original `revision`, and the same key with a
@@ -739,7 +754,7 @@ paths:
     get:
       tags:
       - Read
-      summary: List placements visible to the caller
+      summary: List placements visible to the caller.
       operationId: list_placements
       parameters:
       - name: limit
@@ -770,7 +785,7 @@ paths:
     post:
       tags:
       - Commands
-      summary: Create a placement
+      summary: Create a Placement for an existing tile/plan.
       operationId: create_placement
       requestBody:
         description: OwnerCommandRequest<CreatePlacementPayload>
@@ -799,7 +814,7 @@ paths:
     post:
       tags:
       - Execution
-      summary: Start an execution
+      summary: Start an execution for a placement.
       operationId: start_execution
       parameters:
       - name: id
@@ -833,7 +848,7 @@ paths:
     post:
       tags:
       - Prompt
-      summary: Request a server-issued prompt
+      summary: Request a server-issued prompt.
       operationId: request_prompt
       requestBody:
         content:
@@ -857,7 +872,7 @@ paths:
     get:
       tags:
       - Prompt
-      summary: List pending prompts
+      summary: List pending prompts.
       operationId: list_pending_prompts
       parameters:
       - name: limit
@@ -897,7 +912,7 @@ paths:
     post:
       tags:
       - Prompt
-      summary: Respond to a startup recovery prompt
+      summary: Respond to a startup recovery prompt.
       operationId: respond_startup_recovery
       requestBody:
         content:
@@ -923,7 +938,7 @@ paths:
     post:
       tags:
       - Prompt
-      summary: Resolve a prompt
+      summary: Resolve a prompt.
       operationId: resolve_prompt
       parameters:
       - name: prompt_id
@@ -957,7 +972,7 @@ paths:
     get:
       tags:
       - Read
-      summary: List recurring instances
+      summary: Frame instances generated for one Recurring definition.
       operationId: list_recurring_instances
       parameters:
       - name: id
@@ -1005,7 +1020,7 @@ paths:
     get:
       tags:
       - Runtime
-      summary: List runtime device paths for the caller
+      summary: List all runtime path entries for the caller's owner.
       operationId: list_runtime_paths
       responses:
         '200':
@@ -1022,7 +1037,7 @@ paths:
     post:
       tags:
       - Runtime
-      summary: Upsert a runtime device path for the caller
+      summary: Upsert one runtime path entry for the caller's owner.
       operationId: upsert_runtime_path
       requestBody:
         description: Path entry to upsert
@@ -1041,7 +1056,7 @@ paths:
     post:
       tags:
       - SourceTile
-      summary: Publish a schedule definition
+      summary: Publish a schedule definition.
       operationId: publish_schedule_definition
       requestBody:
         content:
@@ -1065,7 +1080,11 @@ paths:
     get:
       tags:
       - Read
-      summary: List the schedule reference catalog
+      summary: 'Schedule reference catalog for one `usage`, ordered by
+
+        `span_start ASC, placement_id ASC`.  Always scoped to the
+
+        authenticated owner; there is no owner_id query parameter.'
       operationId: list_schedule_reference_catalog
       parameters:
       - name: usage
@@ -1112,7 +1131,7 @@ paths:
     get:
       tags:
       - Read
-      summary: List sessions
+      summary: Open decision sessions of the caller, newest first.
       operationId: list_sessions
       parameters:
       - name: limit
@@ -1150,7 +1169,9 @@ paths:
     post:
       tags:
       - Commands
-      summary: Create a session
+      summary: 'Create a Decision Session from evaluated decision runs and an
+
+        interaction tree (v1/06).'
       operationId: create_session
       requestBody:
         description: CommandRequest<CreateSessionPayload>
@@ -1177,7 +1198,7 @@ paths:
     get:
       tags:
       - Read
-      summary: List deliveries for a session
+      summary: Deliveries of one decision session, most-recent first.
       operationId: list_session_deliveries
       parameters:
       - name: id
@@ -1231,7 +1252,9 @@ paths:
     post:
       tags:
       - Commands
-      summary: Enqueue a delivery
+      summary: 'Enqueue a delivery of a session to an endpoint.  The payload
+
+        `session_id` must equal the `{id}` path parameter.'
       operationId: enqueue_delivery
       parameters:
       - name: id
@@ -1268,7 +1291,7 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: List source tiles
+      summary: List SourceTiles owned by the authenticated or queried owner.
       operationId: list_source_tiles
       parameters:
       - name: owner_id
@@ -1306,7 +1329,7 @@ paths:
     post:
       tags:
       - SourceTile
-      summary: Create a source tile
+      summary: Create a new SourceTile.  Server owns all aggregate ids.
       operationId: create_source_tile
       requestBody:
         description: SourceTile command envelope
@@ -1331,7 +1354,7 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: Get a source tile with occurrences and placements
+      summary: Read one SourceTile plus its occurrences and placements.
       operationId: get_source_tile
       parameters:
       - name: id
@@ -1389,7 +1412,11 @@ paths:
     put:
       tags:
       - SourceTile
-      summary: Update a source tile
+      summary: 'Replace the SourceTile schedule, occurrence set, and revision.
+
+        Preserves historical occurrences/placement identity; advances
+
+        the SourceTile revision.'
       operationId: update_source_tile
       parameters:
       - name: id
@@ -1422,7 +1449,17 @@ paths:
     post:
       tags:
       - SourceTile
-      summary: Cancel a source tile
+      summary: 'Cancel a SourceTile. Transitions the source from ACTIVE to
+
+        CANCELLED, emits a `v1_source_lifecycle_event` row, and closes
+
+        every source-managed (`source.kind = 4`) Placement whose span
+
+        overlaps the source''s effective horizon. Running executions on
+
+        the closed placements finish naturally; new work cannot be
+
+        dispatched against them. Idempotent on retry.'
       operationId: cancel_source_tile
       parameters:
       - name: id
@@ -1459,7 +1496,15 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: Get source tile completion state
+      summary: 'Derive per-segment and whole-occurrence completion for a SourceTile.
+
+        Complete-set read (v1/14 §15-4): returns every live split
+
+        occurrence of the source — no LIMIT, no paging.  Paging
+
+        parameters (`limit` / `cursor` / `offset` / `occurrence_*` /
+
+        `placement_*`) are rejected with VALIDATION.'
       operationId: get_source_tile_completion
       parameters:
       - name: id
@@ -1492,7 +1537,7 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: List placements of a source tile
+      summary: List canonical Placement rows for a SourceTile in owner scope.
       operationId: list_source_tile_placements
       parameters:
       - name: id
@@ -1538,7 +1583,11 @@ paths:
     post:
       tags:
       - SourceTile
-      summary: Reflow a source tile's schedule
+      summary: 'Re-evaluate the SourceTile within a window.  Closes affected
+
+        auto-managed future placements and emits replacements without
+
+        touching detached / execution / placement-override rows.'
       operationId: reflow_source_tile
       parameters:
       - name: id
@@ -1690,7 +1739,11 @@ paths:
     post:
       tags:
       - Commands
-      summary: Create a tile
+      summary: 'Create a Tile.  `kind = 0` (RECURRING) is rejected with 410 —
+
+        recurring creation goes through `/v1/source-tiles`; `frame_rule`
+
+        must be absent for accepted kinds.'
       operationId: create_tile
       requestBody:
         description: OwnerCommandRequest<CreateTilePayload>
@@ -1719,7 +1772,7 @@ paths:
     get:
       tags:
       - Read
-      summary: Get the timeline read model
+      summary: Placements intersecting a required time range (v1/14 §4).
       description: 'Returns a bare JSON array of timeline items ordered by
 
         `span.start ASC, placement_id ASC`.  `include_labels=true` adds
