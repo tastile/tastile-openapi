@@ -4,6 +4,41 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.8.0 — 2026-11-20
+
+- Wire contract from `tastile-core` `release-2-0-0` @ `e8219616` (core#399 /
+  core PR #400: OpenAPI security schemes, operation summaries, servers,
+  pinned `info.version`).
+- 36 paths, 196 component schemas — path/schema set unchanged; the diff is
+  contract metadata only (0 added/removed/changed operations or schemas,
+  verified by full-document semantic diff).
+- `openapi.yaml` `info.version` `1.1.0` → `1.2.0` (additive contract
+  metadata; the axis stays independent of the Core product version 2.0.0
+  per `docs/compatibility.md`).
+- Redocly lint (`redocly/cli` 1.25.5, CI gate): **0 errors** — was 58
+  errors on v3.7.0 (`security-defined` 46, `operation-summary` 11,
+  `operation-4xx-response` 1, `no-empty-servers` 1). Remaining: 1 warning,
+  `operation-4xx-response` on `signout`, which is intentional — the
+  endpoint is contractually idempotent and returns 204 for absent or
+  unresolvable credentials.
+
+Additive contract metadata (MINOR bump — no wire-format change):
+
+- `components.securitySchemes`: `bearerAuth` (HTTP bearer; `tastile_api_token`
+  cookie is a documented fallback), `webAssertion`
+  (`x-tastile-web-assertion`), `webBridgeSecret` + `webBridgeSessionUser`
+  (ANDed pair for the web BFF bridge), `apiTokenCookie`.
+- Root `security`: the four credential alternatives as OR requirements,
+  matching `authenticate_v2` precedence in `tastile-core`.
+- `GET /v1/owners/{kind}/{id}/profile` declares an anonymous `{}`
+  alternative plus credentials — unauthenticated callers intentionally
+  receive a minimal projection.
+- `servers: [{url: "/"}]` (the document is served same-origin at
+  `/v1/openapi.json`).
+- `summary` on all 46 documented operations.
+- `x-tastile-required-scope` extensions are unchanged and remain the
+  authoritative per-operation scope metadata.
+
 ## v3.7.0 — 2026-11-18
 
 - Wire contract from `tastile-core` `release-1-1-0` @ `1380ec30` (core#368

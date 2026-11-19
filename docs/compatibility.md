@@ -8,8 +8,8 @@
 
 | 軸 | 正本 | 現在値 | bump 条件 |
 | --- | --- | --- | --- |
-| spec リリース版 | git tag `vX.Y.Z` + `CHANGELOG.md` | `v3.7.0` | wire format の互換性変化 (MAJOR=破壊的 / MINOR=後方互換追加 / PATCH=cosmetic) |
-| API 契約版 | `openapi.yaml` `info.version` | `1.1.0` | v1 API 面の契約版。spec リリース版とも Core 製品版とも独立 |
+| spec リリース版 | git tag `vX.Y.Z` + `CHANGELOG.md` | `v3.8.0` | wire format の互換性変化 (MAJOR=破壊的 / MINOR=後方互換追加 / PATCH=cosmetic) |
+| API 契約版 | `openapi.yaml` `info.version` | `1.2.0` | v1 API 面の契約版。spec リリース版とも Core 製品版とも独立 |
 | Core 製品版 | `tastile-core` `crates-v1` workspace version | `2.0.0` (release-2-0-0) / `1.0.2` (release-1-1-0 系) | Core の release train が決定 |
 
 **要求しないこと**: spec 版 = Core 版の一致、`info.version` = spec 版の一致、
@@ -20,6 +20,7 @@
 | spec 版 | tag / commit | 生成元 Core | Core 側の版・SHA | consumer pin | 検証証跡 |
 | --- | --- | --- | --- | --- | --- |
 | v3.7.0 | `v3.7.0` / `86e4964` | `dump_openapi` @ `release-1-1-0` | 製品版系 1.x / `1380ec30` | root `openapi/` submodule、web PR #238、cli PR #27、android PR #114 | byte-identical regen 確認済み (core `368` branch `baf72742` 生成物と一致) |
+| v3.8.0 | `v3.8.0` (tag pending merge) / branch `27` | `dump_openapi` @ `release-2-0-0` | 製品版 2.0.0 / `e8219616` (core PR #400) | 未更新 — consumer regen は merge 後 | redocly lint 0 errors (旧 58) / semantic diff 0 ops・0 schemas 変更 |
 
 過去版の対応は `CHANGELOG.md` を参照。各エントリが生成元 Core SHA を記録する。
 
