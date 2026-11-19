@@ -9,13 +9,15 @@ info:
   license:
     name: Apache-2.0
     identifier: Apache-2.0
-  version: 1.1.0
+  version: 1.2.0
+servers:
+- url: /
 paths:
   /v1/access/grants:
     get:
       tags:
       - Access
-      summary: Grants visible to the actor (as owner or grantee), newest first.
+      summary: List access grants
       operationId: list_access_grants
       parameters:
       - name: limit
@@ -54,7 +56,7 @@ paths:
     get:
       tags:
       - Access
-      summary: PENDING grants where the actor is the recipient, newest first.
+      summary: List pending access grants for the caller
       operationId: list_pending_access_grants
       parameters:
       - name: limit
@@ -93,7 +95,7 @@ paths:
     get:
       tags:
       - Access
-      summary: Audit history of one grant, most recent first.
+      summary: List access grant audit events
       operationId: list_access_grant_audit
       parameters:
       - name: id
@@ -141,9 +143,7 @@ paths:
     get:
       tags:
       - Access
-      summary: 'Notification inbox of the actor, newest first.  `unread_only`
-
-        filters in SQL before pagination.'
+      summary: List access notifications
       operationId: list_access_notifications
       parameters:
       - name: limit
@@ -188,7 +188,7 @@ paths:
     get:
       tags:
       - Auth
-      summary: API tokens of the caller, newest first.  OwnerAdmin only.
+      summary: List API tokens for the caller
       operationId: list_api_tokens
       parameters:
       - name: limit
@@ -228,11 +228,7 @@ paths:
     post:
       tags:
       - Auth
-      summary: 'Mint an API token.  OwnerAdmin only; `expires_at` is required at
-
-        the wire level (omitted/null is a 400 Validation error).  The raw
-
-        `token` is returned exactly once.'
+      summary: Create an API token
       operationId: create_api_token
       requestBody:
         description: CreateApiTokenRequest
@@ -259,6 +255,7 @@ paths:
     post:
       tags:
       - Auth
+      summary: Revoke the caller's credential (Bearer token or cookie)
       operationId: signout
       responses:
         '204':
@@ -268,7 +265,7 @@ paths:
     get:
       tags:
       - Read
-      summary: Open placements without an active execution (candidates).
+      summary: List open placements without an active execution
       operationId: list_candidates
       parameters:
       - name: limit
@@ -307,9 +304,7 @@ paths:
     get:
       tags:
       - Read
-      summary: 'Delivery destinations (push / web-push / email endpoints) of the
-
-        caller, newest first.'
+      summary: List delivery endpoints
       operationId: list_endpoints
       parameters:
       - name: limit
@@ -349,9 +344,7 @@ paths:
     post:
       tags:
       - Commands
-      summary: 'Register a delivery endpoint (push / web-push / email).  The token
-
-        is stored encrypted and never returned (v1/14 §9-10).'
+      summary: Create a delivery endpoint
       operationId: create_endpoint
       requestBody:
         description: EndpointInput
@@ -378,7 +371,7 @@ paths:
     get:
       tags:
       - Read
-      summary: Deliveries routed to one endpoint, most-recent first.
+      summary: List deliveries for an endpoint
       operationId: list_endpoint_deliveries
       parameters:
       - name: id
@@ -433,6 +426,7 @@ paths:
     post:
       tags:
       - Execution
+      summary: Finish an execution
       operationId: finish_execution
       parameters:
       - name: id
@@ -464,6 +458,7 @@ paths:
     post:
       tags:
       - Execution
+      summary: Pause an execution
       operationId: pause_execution
       parameters:
       - name: id
@@ -497,6 +492,7 @@ paths:
     post:
       tags:
       - Execution
+      summary: Resume an execution
       operationId: resume_execution
       parameters:
       - name: id
@@ -530,7 +526,7 @@ paths:
     get:
       tags:
       - Read
-      summary: Distinct TIME_WINDOW annotation labels of the caller.
+      summary: List labels
       operationId: list_labels
       parameters:
       - name: owner_ids
@@ -575,9 +571,7 @@ paths:
     delete:
       tags:
       - Owner
-      summary: 'Soft-tombstone one owner.  Returns the deletion timestamp and
-
-        the retention window.'
+      summary: Delete the owner account and all owned data
       operationId: delete_owner
       parameters:
       - name: kind
@@ -610,9 +604,7 @@ paths:
     get:
       tags:
       - Owner
-      summary: 'Stream all owner rows as NDJSON (`application/x-ndjson`).
-
-        Permitted for tombstoned owners too (GDPR Art.20 portability).'
+      summary: Export all owner data as NDJSON
       operationId: export_owner
       parameters:
       - name: kind
@@ -645,7 +637,7 @@ paths:
     get:
       tags:
       - Owner
-      summary: Read one owner profile (v1/15 §3).
+      summary: Get the owner profile (minimal projection when unauthenticated)
       description: 'The response is a credential-dependent projection: without a
 
         valid credential only `kind`/`id`/`display_name`/`avatar_url`
@@ -680,10 +672,17 @@ paths:
           description: Owner not found
         '501':
           description: Unsupported owner kind
+      security:
+      - {}
+      - bearerAuth: []
+      - webAssertion: []
+      - webBridgeSecret: []
+        webBridgeSessionUser: []
+      - apiTokenCookie: []
     patch:
       tags:
       - Owner
-      summary: PATCH one owner profile (v1/14 §9-1, v1/15 §3).
+      summary: Update the owner profile
       description: '`Idempotency-Key` is mandatory: the same key with the same body
 
         replays the original `revision`, and the same key with a
@@ -740,6 +739,7 @@ paths:
     get:
       tags:
       - Read
+      summary: List placements visible to the caller
       operationId: list_placements
       parameters:
       - name: limit
@@ -770,7 +770,7 @@ paths:
     post:
       tags:
       - Commands
-      summary: Create a Placement for an existing tile/plan.
+      summary: Create a placement
       operationId: create_placement
       requestBody:
         description: OwnerCommandRequest<CreatePlacementPayload>
@@ -799,6 +799,7 @@ paths:
     post:
       tags:
       - Execution
+      summary: Start an execution
       operationId: start_execution
       parameters:
       - name: id
@@ -832,6 +833,7 @@ paths:
     post:
       tags:
       - Prompt
+      summary: Request a server-issued prompt
       operationId: request_prompt
       requestBody:
         content:
@@ -855,6 +857,7 @@ paths:
     get:
       tags:
       - Prompt
+      summary: List pending prompts
       operationId: list_pending_prompts
       parameters:
       - name: limit
@@ -894,6 +897,7 @@ paths:
     post:
       tags:
       - Prompt
+      summary: Respond to a startup recovery prompt
       operationId: respond_startup_recovery
       requestBody:
         content:
@@ -919,6 +923,7 @@ paths:
     post:
       tags:
       - Prompt
+      summary: Resolve a prompt
       operationId: resolve_prompt
       parameters:
       - name: prompt_id
@@ -952,7 +957,7 @@ paths:
     get:
       tags:
       - Read
-      summary: Frame instances generated for one Recurring definition.
+      summary: List recurring instances
       operationId: list_recurring_instances
       parameters:
       - name: id
@@ -1000,7 +1005,7 @@ paths:
     get:
       tags:
       - Runtime
-      summary: List all runtime path entries for the caller's owner.
+      summary: List runtime device paths for the caller
       operationId: list_runtime_paths
       responses:
         '200':
@@ -1017,7 +1022,7 @@ paths:
     post:
       tags:
       - Runtime
-      summary: Upsert one runtime path entry for the caller's owner.
+      summary: Upsert a runtime device path for the caller
       operationId: upsert_runtime_path
       requestBody:
         description: Path entry to upsert
@@ -1036,6 +1041,7 @@ paths:
     post:
       tags:
       - SourceTile
+      summary: Publish a schedule definition
       operationId: publish_schedule_definition
       requestBody:
         content:
@@ -1059,11 +1065,7 @@ paths:
     get:
       tags:
       - Read
-      summary: 'Schedule reference catalog for one `usage`, ordered by
-
-        `span_start ASC, placement_id ASC`.  Always scoped to the
-
-        authenticated owner; there is no owner_id query parameter.'
+      summary: List the schedule reference catalog
       operationId: list_schedule_reference_catalog
       parameters:
       - name: usage
@@ -1110,7 +1112,7 @@ paths:
     get:
       tags:
       - Read
-      summary: Open decision sessions of the caller, newest first.
+      summary: List sessions
       operationId: list_sessions
       parameters:
       - name: limit
@@ -1148,9 +1150,7 @@ paths:
     post:
       tags:
       - Commands
-      summary: 'Create a Decision Session from evaluated decision runs and an
-
-        interaction tree (v1/06).'
+      summary: Create a session
       operationId: create_session
       requestBody:
         description: CommandRequest<CreateSessionPayload>
@@ -1177,7 +1177,7 @@ paths:
     get:
       tags:
       - Read
-      summary: Deliveries of one decision session, most-recent first.
+      summary: List deliveries for a session
       operationId: list_session_deliveries
       parameters:
       - name: id
@@ -1231,9 +1231,7 @@ paths:
     post:
       tags:
       - Commands
-      summary: 'Enqueue a delivery of a session to an endpoint.  The payload
-
-        `session_id` must equal the `{id}` path parameter.'
+      summary: Enqueue a delivery
       operationId: enqueue_delivery
       parameters:
       - name: id
@@ -1270,7 +1268,7 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: List SourceTiles owned by the authenticated or queried owner.
+      summary: List source tiles
       operationId: list_source_tiles
       parameters:
       - name: owner_id
@@ -1308,7 +1306,7 @@ paths:
     post:
       tags:
       - SourceTile
-      summary: Create a new SourceTile.  Server owns all aggregate ids.
+      summary: Create a source tile
       operationId: create_source_tile
       requestBody:
         description: SourceTile command envelope
@@ -1333,7 +1331,7 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: Read one SourceTile plus its occurrences and placements.
+      summary: Get a source tile with occurrences and placements
       operationId: get_source_tile
       parameters:
       - name: id
@@ -1391,11 +1389,7 @@ paths:
     put:
       tags:
       - SourceTile
-      summary: 'Replace the SourceTile schedule, occurrence set, and revision.
-
-        Preserves historical occurrences/placement identity; advances
-
-        the SourceTile revision.'
+      summary: Update a source tile
       operationId: update_source_tile
       parameters:
       - name: id
@@ -1428,17 +1422,7 @@ paths:
     post:
       tags:
       - SourceTile
-      summary: 'Cancel a SourceTile. Transitions the source from ACTIVE to
-
-        CANCELLED, emits a `v1_source_lifecycle_event` row, and closes
-
-        every source-managed (`source.kind = 4`) Placement whose span
-
-        overlaps the source''s effective horizon. Running executions on
-
-        the closed placements finish naturally; new work cannot be
-
-        dispatched against them. Idempotent on retry.'
+      summary: Cancel a source tile
       operationId: cancel_source_tile
       parameters:
       - name: id
@@ -1475,15 +1459,7 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: 'Derive per-segment and whole-occurrence completion for a SourceTile.
-
-        Complete-set read (v1/14 §15-4): returns every live split
-
-        occurrence of the source — no LIMIT, no paging.  Paging
-
-        parameters (`limit` / `cursor` / `offset` / `occurrence_*` /
-
-        `placement_*`) are rejected with VALIDATION.'
+      summary: Get source tile completion state
       operationId: get_source_tile_completion
       parameters:
       - name: id
@@ -1516,7 +1492,7 @@ paths:
     get:
       tags:
       - SourceTile
-      summary: List canonical Placement rows for a SourceTile in owner scope.
+      summary: List placements of a source tile
       operationId: list_source_tile_placements
       parameters:
       - name: id
@@ -1562,11 +1538,7 @@ paths:
     post:
       tags:
       - SourceTile
-      summary: 'Re-evaluate the SourceTile within a window.  Closes affected
-
-        auto-managed future placements and emits replacements without
-
-        touching detached / execution / placement-override rows.'
+      summary: Reflow a source tile's schedule
       operationId: reflow_source_tile
       parameters:
       - name: id
@@ -1718,11 +1690,7 @@ paths:
     post:
       tags:
       - Commands
-      summary: 'Create a Tile.  `kind = 0` (RECURRING) is rejected with 410 —
-
-        recurring creation goes through `/v1/source-tiles`; `frame_rule`
-
-        must be absent for accepted kinds.'
+      summary: Create a tile
       operationId: create_tile
       requestBody:
         description: OwnerCommandRequest<CreateTilePayload>
@@ -1751,7 +1719,7 @@ paths:
     get:
       tags:
       - Read
-      summary: Placements intersecting a required time range (v1/14 §4).
+      summary: Get the timeline read model
       description: 'Returns a bare JSON array of timeline items ordered by
 
         `span.start ASC, placement_id ASC`.  `include_labels=true` adds
@@ -6803,6 +6771,43 @@ components:
           format: date-time
         payload:
           $ref: '#/components/schemas/UpdateSourceTilePayloadSchema'
+  securitySchemes:
+    apiTokenCookie:
+      type: apiKey
+      in: cookie
+      name: tastile_api_token
+      description: API token cookie accepted as a Bearer-token fallback (direct-mode
+        browsers).
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Tastile API token or session token (`Authorization: Bearer <raw>`;
+        the `tastile_api_token` cookie is an equivalent fallback). Scope-limited credentials
+        are constrained per operation by `x-tastile-required-scope`; `all` also carries
+        OwnerAdmin.'
+    webAssertion:
+      type: apiKey
+      in: header
+      name: x-tastile-web-assertion
+      description: Better Auth JWT assertion for direct web-to-core calls (root ADR-0016).
+        Owner-equivalent.
+    webBridgeSecret:
+      type: apiKey
+      in: header
+      name: x-tastile-web-bridge-secret
+      description: Web BFF bridge secret. Must be presented together with `x-tastile-web-session-user`.
+    webBridgeSessionUser:
+      type: apiKey
+      in: header
+      name: x-tastile-web-session-user
+      description: Better Auth user id forwarded by the web BFF bridge. Must be presented
+        together with `x-tastile-web-bridge-secret`.
+security:
+- bearerAuth: []
+- webAssertion: []
+- webBridgeSecret: []
+  webBridgeSessionUser: []
+- apiTokenCookie: []
 tags:
 - name: Read
   description: Per-aggregate Read API (v1/14 §9)
