@@ -1616,6 +1616,51 @@ paths:
         '422':
           description: Detached / execution / override protects a placement
       x-tastile-required-scope: tastile.write
+  /v1/source-tiles/{id}/reflow/preview:
+    post:
+      tags:
+      - SourceTile
+      summary: 'Faithful dry-run of the reflow command (core#413).  Runs the same
+
+        `reflow` code path inside a transaction that is always rolled
+
+        back, so the returned `CommandResponse` meta classifies the
+
+        outcome exactly like `apply`.  Writes nothing: no idempotency
+
+        record, outbox event, or domain event.  `expected_revision` is
+
+        enforced identically — a stale preview returns 409.'
+      operationId: preview_source_tile_reflow
+      parameters:
+      - name: id
+        in: path
+        description: SourceTile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: SourceTile reflow command envelope
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReflowSourceTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response identical in shape to apply; nothing was written
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '404':
+          description: Not found or not accessible
+        '409':
+          description: Stale expected_revision
+        '422':
+          description: Detached / execution / override protects a placement
+      x-tastile-required-scope: tastile.write
   /v1/tiles:
     get:
       tags:
