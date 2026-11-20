@@ -4,6 +4,20 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.9.0 — 2026-11-20
+
+- Wire contract from `tastile-core` `release-2-0-0` @ `bf4422d9` (core#413 /
+  core PR #415: faithful reflow preview endpoint).
+- Adds `POST /v1/source-tiles/{id}/reflow/preview`
+  (`preview_source_tile_reflow`): runs the same reflow code path inside a
+  rolled-back transaction and returns the `CommandResponse` apply would
+  produce. Requires the `tastile.write` scope and `expected_revision`,
+  enforced identically to apply (stale → 409).
+- 1 added operation, 0 removed/changed operations or schemas (verified by
+  full-document semantic diff against v3.8.1).
+
+MINOR (backward-compatible addition).
+
 ## v3.8.1 — 2026-11-20
 
 - Wire contract from `tastile-core` `release-2-0-0` @ `0e6ecb2f` (core PR #401:
