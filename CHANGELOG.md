@@ -4,6 +4,22 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v3.10.0 — 2026-11-23
+
+- Wire contract from `tastile-core` `release-2-1-0` @ `a88bd3d1` (core#504 /
+  core PR #533 + #534: publish `GET /v1/sync`, standardize `CURSOR_EXPIRED`).
+- Adds `GET /v1/sync` (`get_sync`) with `SyncResponseSchema` /
+  `SyncChangeSchema` / `SyncAggregateRefSchema`, and `ApiErrorSchema` as the
+  machine-processable body for the HTTP 410 response.
+- `ApiErrorKind` gains value `8` = `CURSOR_EXPIRED`; the 410 body is now the
+  standard `ApiError` envelope (`{kind, message, current_revision,
+  violations}`) instead of a bespoke `error.code` object.
+- 1 added path, 4 added schemas, 0 removed/changed operations or schemas
+  (verified by full-document diff against v3.9.0).
+
+MINOR (backward-compatible addition; `DOMAIN_EVENT_RETENTION_ENABLED`
+remains OFF until consumer resync support ships).
+
 ## v3.9.0 — 2026-11-20
 
 - Wire contract from `tastile-core` `release-2-0-0` @ `bf4422d9` (core#413 /
