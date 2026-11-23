@@ -1661,6 +1661,49 @@ paths:
         '422':
           description: Detached / execution / override protects a placement
       x-tastile-required-scope: tastile.write
+  /v1/sync:
+    get:
+      tags:
+      - Read
+      summary: List aggregate change notifications after `cursor`.
+      operationId: get_sync
+      parameters:
+      - name: cursor
+        in: query
+        description: Opaque forward-only cursor from a previous `next_cursor`; omit
+          for the full retention-window resync
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Page size; default 100, hard-capped at 500
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Change notifications in (occurred_at, id) order; `next_cursor`
+            is empty when `changes` is empty — page until `changes` is empty
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResponseSchema'
+        '400':
+          description: Malformed cursor
+        '401':
+          description: Missing or invalid auth
+        '403':
+          description: Missing `tastile.read` scope
+        '410':
+          description: Cursor predates the owner's retention frontier (`ApiErrorKind`
+            8 = CURSOR_EXPIRED). Discard the cursor and resync per v1/14 §6-1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorSchema'
+      x-tastile-required-scope: tastile.read
   /v1/tiles:
     get:
       tags:
@@ -2303,6 +2346,37 @@ components:
           $ref: '#/components/schemas/PickSchema'
         when:
           $ref: '#/components/schemas/ConditionRefSchema'
+    ApiErrorSchema:
+      type: object
+      description: 'Mirror of `domain::command::ApiError` — the standard error envelope
+
+        returned by every non-2xx response (v1/14 §1-4).  `kind` is the
+
+        numeric `ApiErrorKind` registry value (0=VALIDATION …
+
+        8=CURSOR_EXPIRED); `violations` mirrors
+
+        `domain::resolver::ResolutionViolation`.'
+      required:
+      - kind
+      - message
+      - violations
+      properties:
+        current_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        kind:
+          type: integer
+          format: int32
+          description: Numeric `ApiErrorKind` constant.
+        message:
+          type: string
+        violations:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineViolationSchema'
     ApiTokenCreateRequestSchema:
       type: object
       description: '`POST /v1/api-tokens` request body (ADR-0010 §D-1.1 + Issue #153
@@ -6132,6 +6206,68 @@ components:
           format: uuid
         payload:
           $ref: '#/components/schemas/StartupRecoveryPayloadSchema'
+    SyncAggregateRefSchema:
+      type: object
+      description: 'Mirror of `domain::command::AggregateRef` for `GET /v1/sync`.
+
+        `kind` is the numeric `AggregateKind` registry value
+
+        (0=Recurring / 1=Placement / 2=Execution / 3=Session / 4=Source).'
+      required:
+      - kind
+      - id
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+    SyncChangeSchema:
+      type: object
+      description: 'Mirror of `domain::read::SyncChange` for `GET /v1/sync`.
+
+        `kind` is the numeric `SyncChangeKind` registry value (v1/14 §6:
+
+        0=PLACEMENT_CREATED / 1=PLACEMENT_UPDATED / 2=PLACEMENT_CLOSED /
+
+        3=EXECUTION_STARTED / 4=EXECUTION_UPDATED / 5=EXECUTION_FINISHED).'
+      required:
+      - kind
+      - aggregate
+      - revision
+      - occurred_at
+      properties:
+        aggregate:
+          $ref: '#/components/schemas/SyncAggregateRefSchema'
+        kind:
+          type: integer
+          format: int32
+        occurred_at:
+          type: string
+          format: date-time
+        revision:
+          type: integer
+          format: int64
+    SyncResponseSchema:
+      type: object
+      description: 'Mirror of `domain::read::SyncResponse` for `GET /v1/sync`.
+
+        `next_cursor` is the opaque forward-only cursor for the next page; it
+
+        is an empty string when the page carried no changes.  Clients page
+
+        until a response returns an empty `changes` array.'
+      required:
+      - changes
+      - next_cursor
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncChangeSchema'
+        next_cursor:
+          type: string
     TargetRefSchema:
       oneOf:
       - type: object
