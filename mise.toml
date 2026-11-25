@@ -1,5 +1,6 @@
 # Auxiliary project-local tooling for Agent Skills.
-# OpenAPI generation itself remains owned by tastile-core + documented yq flow.
+# OpenAPI generation itself remains owned by tastile-core + the PyYAML
+# regeneration flow documented in README.md.
 
 [tools]
 bun = "1.4.2"
