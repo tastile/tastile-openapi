@@ -4,6 +4,39 @@ All notable changes to the canonical OpenAPI specification are documented
 here. The version follows Semantic Versioning; a breaking change to the
 wire format is a MAJOR bump.
 
+## v4.0.0 — 2026-11-24
+
+- Wire contract from `tastile-core` `release-2-1-0` @ `b0d706e0` (core#558 /
+  core#559 / core#560 / core#572, merged via PR #568 / #569 / #570 / #577:
+  sync contract v2 snapshot/delta/SSE + offline command `observedAt` +
+  `CommandResponse.received_at`/`accepted_at`).
+- Adds `GET /v1/sync/snapshot` (`get_sync_snapshot`) returning
+  `SyncSnapshotResponseSchema` (`snapshot_cursor` + `SyncEntitySchema`
+  pages) and `GET /v1/sync/stream` (`get_sync_stream`), the SSE
+  change-notification doorbell (`text/event-stream`, `Last-Event-ID`
+  resume, heartbeat/`retry:` hints, per-owner/global connection caps,
+  429 `ApiError` body).
+- `SyncChangeSchema` is replaced by the entity-oriented v2 shape
+  (`change_kind` 0=UPSERT / 1=TOMBSTONE, `entity_kind`, `entity_id`,
+  `occurred_at`, `state`); `SyncEntityKind` registry is 0=TILE /
+  1=SOURCE_TILE / 2=PLACEMENT / 3=EXECUTION / 4=SESSION
+  (v1/14 §6-1..§6-4).
+- `GET /v1/sync` `limit` is now `1..=1000` (default 100) with out-of-range
+  `422`; the `400` malformed-cursor response is removed in favor of `422`.
+- All command request schemas gain optional `observed_at`
+  (v1/14 §1-1 `observedAt`); `occurred_at` remains on the wire as the
+  deprecated alias the server ignores (core#560).
+- `CommandResponse` gains required `received_at` (server receipt time)
+  and `accepted_at` is now documented as the commit-confirmed time
+  (core#572, v1/14 §1-1 "Received at" / "Committed at").
+- 2 added paths, 2 added schemas, 1 removed schema, 18 changed schemas,
+  1 changed operation (verified by full-document semantic diff against
+  v3.10.0).
+
+MAJOR (`SyncChangeSchema` field set replaced and `SyncAggregateRefSchema`
+removed — generated client types for sync consumers break; `observed_at`
+additions and the two new endpoints are otherwise additive).
+
 ## v3.10.0 — 2026-11-23
 
 - Wire contract from `tastile-core` `release-2-1-0` @ `a88bd3d1` (core#504 /

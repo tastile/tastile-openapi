@@ -1665,7 +1665,7 @@ paths:
     get:
       tags:
       - Read
-      summary: List aggregate change notifications after `cursor`.
+      summary: List sync entity changes after `cursor`.
       operationId: get_sync
       parameters:
       - name: cursor
@@ -1677,28 +1677,133 @@ paths:
           type: string
       - name: limit
         in: query
-        description: Page size; default 100, hard-capped at 500
+        description: Page size 1..=1000 (default 100); out of range is rejected
         required: false
         schema:
           type: integer
           format: int64
       responses:
         '200':
-          description: Change notifications in (occurred_at, id) order; `next_cursor`
-            is empty when `changes` is empty — page until `changes` is empty
+          description: Sync changes in (occurred_at, id) order; `next_cursor` is empty
+            when no events remain — page until `next_cursor` is empty (`changes` may
+            be empty on a non-final page)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SyncResponseSchema'
-        '400':
-          description: Malformed cursor
         '401':
           description: Missing or invalid auth
         '403':
           description: Missing `tastile.read` scope
         '410':
           description: Cursor predates the owner's retention frontier (`ApiErrorKind`
-            8 = CURSOR_EXPIRED). Discard the cursor and resync per v1/14 §6-1
+            8 = CURSOR_EXPIRED). Discard the cursor and resync via `GET /v1/sync/snapshot`
+            per v1/14 §6-1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorSchema'
+        '422':
+          description: Invalid cursor or limit
+      x-tastile-required-scope: tastile.read
+  /v1/sync/snapshot:
+    get:
+      tags:
+      - Read
+      summary: Snapshot of the current read-model projection for offline sync.
+      operationId: get_sync_snapshot
+      parameters:
+      - name: from
+        in: query
+        description: Optional RFC3339 lower bound for time-series entities (PLACEMENT
+          / EXECUTION / SESSION)
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: Optional RFC3339 exclusive upper bound for time-series entities
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: cursor
+        in: query
+        description: Opaque snapshot-scoped page cursor from a previous `next_cursor`;
+          delta cursors are rejected
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Page size 1..=1000 (default 100); out of range is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        description: Retired; any value is rejected
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Snapshot page in (entity_kind, entity_id) order; `snapshot_cursor`
+            is identical on every page and seeds `GET /v1/sync`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncSnapshotResponseSchema'
+        '401':
+          description: Missing or invalid auth
+        '403':
+          description: Missing `tastile.read` scope
+        '422':
+          description: Invalid cursor, limit, offset, or time range
+      x-tastile-required-scope: tastile.read
+  /v1/sync/stream:
+    get:
+      tags:
+      - Read
+      summary: SSE change-notification stream (v1/14 §6-6, core#559).
+      description: 'Notification-only doorbell: `change` events carry
+
+        `{entityKind, entityId, changeKind}` and the sync cursor as the
+
+        SSE `id` — never entity state.  Clients pull `GET /v1/sync` for
+
+        state.  `Last-Event-ID` resumes from a sync cursor; an expired
+
+        cursor yields one `cursor-expired` event then close.  Delivery
+
+        is best-effort.'
+      operationId: get_sync_stream
+      parameters:
+      - name: Last-Event-ID
+        in: header
+        description: Sync cursor of the last received `change` event; resumes replay
+          after that position
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+      responses:
+        '200':
+          description: '`text/event-stream` of `change` notifications (`{entityKind,
+            entityId, changeKind}` + cursor `id`), `: ping` heartbeats with `retry:`
+            hints, and terminal `cursor-expired` / `overflow` / `rejected` events'
+        '401':
+          description: Missing or invalid auth
+        '403':
+          description: Missing `tastile.read` scope
+        '422':
+          description: Invalid `Last-Event-ID` cursor
+        '429':
+          description: Per-owner (4) or global connection cap reached
           content:
             application/json:
               schema:
@@ -2562,6 +2667,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -2833,6 +2946,7 @@ components:
       type: object
       required:
       - command_id
+      - received_at
       - accepted_at
       - result
       - pending
@@ -2840,6 +2954,7 @@ components:
         accepted_at:
           type: string
           format: date-time
+          description: Commit-confirmed time (v1/14 §1-1 "Committed at").
         aggregate:
           oneOf:
           - type: 'null'
@@ -2855,6 +2970,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PendingWorkSchema'
+        received_at:
+          type: string
+          format: date-time
+          description: Server receipt time (v1/14 §1-1 "Received at").
         result:
           type: integer
           format: int32
@@ -2999,6 +3118,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -3050,6 +3177,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -3103,6 +3238,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -3176,6 +3319,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -3429,6 +3580,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -3455,6 +3614,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -3618,6 +3785,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -4663,6 +4838,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -4884,6 +5067,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -5152,6 +5343,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -5208,6 +5407,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -6147,6 +6354,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -6194,6 +6409,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
@@ -6206,58 +6429,66 @@ components:
           format: uuid
         payload:
           $ref: '#/components/schemas/StartupRecoveryPayloadSchema'
-    SyncAggregateRefSchema:
-      type: object
-      description: 'Mirror of `domain::command::AggregateRef` for `GET /v1/sync`.
-
-        `kind` is the numeric `AggregateKind` registry value
-
-        (0=Recurring / 1=Placement / 2=Execution / 3=Session / 4=Source).'
-      required:
-      - kind
-      - id
-      properties:
-        id:
-          type: string
-          format: uuid
-        kind:
-          type: integer
-          format: int32
     SyncChangeSchema:
       type: object
-      description: 'Mirror of `domain::read::SyncChange` for `GET /v1/sync`.
+      description: 'Mirror of `domain::read::SyncChange` for `GET /v1/sync` (v1/14
+        §6-2
 
-        `kind` is the numeric `SyncChangeKind` registry value (v1/14 §6:
+        v2, core#558).  `change_kind` is the numeric `SyncChangeKind`
 
-        0=PLACEMENT_CREATED / 1=PLACEMENT_UPDATED / 2=PLACEMENT_CLOSED /
+        registry value (0=UPSERT / 1=TOMBSTONE); `entity_kind` is the
 
-        3=EXECUTION_STARTED / 4=EXECUTION_UPDATED / 5=EXECUTION_FINISHED).'
+        numeric `SyncEntityKind` registry value (0=TILE / 1=SOURCE_TILE /
+
+        2=PLACEMENT / 3=EXECUTION / 4=SESSION).  `state` is the same JSON
+
+        document the entity kind''s Read endpoint returns; `null` marks a
+
+        tombstone.'
       required:
-      - kind
-      - aggregate
-      - revision
+      - change_kind
+      - entity_kind
+      - entity_id
       - occurred_at
       properties:
-        aggregate:
-          $ref: '#/components/schemas/SyncAggregateRefSchema'
-        kind:
+        change_kind:
+          type: integer
+          format: int32
+        entity_id:
+          type: string
+          format: uuid
+        entity_kind:
           type: integer
           format: int32
         occurred_at:
           type: string
           format: date-time
-        revision:
+        state: {}
+    SyncEntitySchema:
+      type: object
+      description: Mirror of `domain::read::SyncEntity` for `GET /v1/sync/snapshot`.
+      required:
+      - entity_kind
+      - entity_id
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        entity_kind:
           type: integer
-          format: int64
+          format: int32
+        state: {}
     SyncResponseSchema:
       type: object
       description: 'Mirror of `domain::read::SyncResponse` for `GET /v1/sync`.
 
         `next_cursor` is the opaque forward-only cursor for the next page; it
 
-        is an empty string when the page carried no changes.  Clients page
+        is an empty string when no events remain.  Clients page until
 
-        until a response returns an empty `changes` array.'
+        `next_cursor` is empty — `changes` may be empty on a non-final page
+
+        when every event resolved to no sync entity.'
       required:
       - changes
       - next_cursor
@@ -6267,6 +6498,29 @@ components:
           items:
             $ref: '#/components/schemas/SyncChangeSchema'
         next_cursor:
+          type: string
+    SyncSnapshotResponseSchema:
+      type: object
+      description: 'Mirror of `domain::read::SyncSnapshotResponse` for
+
+        `GET /v1/sync/snapshot` (v1/14 §6-1).  `snapshot_cursor` is identical
+
+        on every page of one snapshot walk and is the delta sync starting
+
+        point; `next_cursor` is `null` on the last page.'
+      required:
+      - snapshot_cursor
+      - entities
+      properties:
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncEntitySchema'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+        snapshot_cursor:
           type: string
     TargetRefSchema:
       oneOf:
@@ -6998,6 +7252,14 @@ components:
         idempotency_key:
           type: string
           format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
         occurred_at:
           type:
           - string
