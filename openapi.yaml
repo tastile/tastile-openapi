@@ -1,8 +1,30 @@
 openapi: 3.1.0
 info:
   title: api
-  description: v1 API binary per docs/v1/14. Old v0/tastile-api MUST NOT be imported
-    here.
+  description: 'Tastile v1 API.
+
+
+    Error contract: the API emits TWO error encodings. Domain failures return the
+    structured `ApiError` JSON (kind code + status); transport-level failures (malformed
+    JSON body, serde deserialization) return Axum/plaintext bodies. Treat any non-2xx
+    as failure and parse the structured form when the body is a JSON object with an
+    `error` field.
+
+
+    `expected_revision` scope: enforced strictly on `/v1/source-tiles*` commands (stale
+    → 409 + `current_revision`) and honoured by the tile/placement commands documented
+    here; Execution lifecycle commands (`/v1/executions/{id}/pause|resume|finish`)
+    currently ignore it — do not rely on it for execution optimistic locking.
+
+
+    ChangeSet writes (`POST /v1/placements/{id}/changes`): acceptance (200) is NOT
+    proof of application — change values or activation windows the resolver cannot
+    map may be stored without effect. Always read back via `GET /v1/placements/{id}`
+    and `/v1/timeline`.
+
+
+    Coverage: this document describes the v1 public contract. Routes absent from `paths`
+    are internal, legacy, or ops surfaces and MUST NOT be treated as stable contract.'
   contact:
     name: 361do_sleep
     email: rebuild.up.up@gmail.com
@@ -307,6 +329,31 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+  /v1/change-sets/{id}:
+    get:
+      tags:
+      - Read
+      summary: Read one ChangeSet (`domain::read::ChangeSetView`).
+      operationId: read_change_set
+      parameters:
+      - name: id
+        in: path
+        description: ChangeSet id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ChangeSet view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeSetViewSchema'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: ChangeSet not found / not visible
   /v1/endpoints:
     get:
       tags:
@@ -433,6 +480,58 @@ paths:
         '422':
           description: Invalid cursor, limit, or offset
       x-tastile-required-scope: tastile.read
+  /v1/executions/{id}:
+    get:
+      tags:
+      - Read
+      summary: Read one Execution (`domain::read::ExecutionView`).
+      operationId: read_execution
+      parameters:
+      - name: id
+        in: path
+        description: Execution id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Execution view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionViewSchema'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Execution not found / not visible
+  /v1/executions/{id}/basis:
+    get:
+      tags:
+      - Read
+      summary: 'Read the resolution basis captured at execution start
+
+        (`GET /v1/executions/{id}/basis`).'
+      operationId: read_execution_basis
+      parameters:
+      - name: id
+        in: path
+        description: Execution id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Captured resolution basis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionBasisSchema'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Execution or basis not found
   /v1/executions/{id}/finish:
     post:
       tags:
@@ -807,6 +906,162 @@ paths:
           description: Missing or invalid auth
         '404':
           description: Tile or plan not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
+  /v1/placements/{id}:
+    get:
+      tags:
+      - Read
+      summary: 'Read one Placement with its span, inside-scope, close state, and
+
+        source-occurrence linkage (`handlers::read::PlacementRead`).'
+      operationId: read_placement
+      parameters:
+      - name: id
+        in: path
+        description: Placement id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Placement read view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlacementReadSchema'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Placement not found / not visible
+  /v1/placements/{id}/changes:
+    post:
+      tags:
+      - Commands
+      summary: 'Append a client-built ChangeSet to a Placement
+
+        (`APPEND_CHANGES`).  Silent no-op warning (core#587): the server
+
+        returns 200 for change values / activation windows / layer-rank
+
+        combinations it cannot apply to the placement''s span or
+
+        resolution — acceptance is NOT proof of application.  Read back
+
+        via `GET /v1/placements/{id}` and `/v1/timeline` to confirm.'
+      operationId: append_changes
+      parameters:
+      - name: id
+        in: path
+        description: Placement id; must equal payload.placement_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: OwnerCommandRequest<AppendChangesPayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppendChangesRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Placement not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
+  /v1/placements/{id}/close:
+    post:
+      tags:
+      - Commands
+      summary: 'Close a single Placement occurrence — the single-occurrence
+
+        cancel of core#428.  Idempotent: re-closing returns 200 without a
+
+        revision bump.  Source-managed occurrences are marked closed so
+
+        they are not re-materialized.  Fails 409 while an execution is
+
+        active on the placement.'
+      operationId: close_placement
+      parameters:
+      - name: id
+        in: path
+        description: Placement id; must equal payload.placement_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<ClosePlacementPayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClosePlacementRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Placement not found
+        '409':
+          description: Stale revision, reused idempotency key, or active execution
+      x-tastile-required-scope: tastile.write
+  /v1/placements/{id}/detach:
+    post:
+      tags:
+      - Commands
+      summary: Detach a Placement from its parent scope.
+      operationId: detach_placement
+      parameters:
+      - name: id
+        in: path
+        description: Placement id; must equal payload.placement_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<DetachPlacementPayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetachPlacementRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Placement not found
         '409':
           description: Stale revision or reused idempotency key
       x-tastile-required-scope: tastile.write
@@ -1961,6 +2216,433 @@ paths:
         '410':
           description: kind=RECURRING rejected; use /v1/source-tiles
       x-tastile-required-scope: tastile.write
+  /v1/tiles/{id}:
+    get:
+      tags:
+      - Read
+      summary: 'Read one Tile (`domain::read::TileView`).  Resolves unedited lazy
+
+        segment identities through `segment_identity::effective_tile`, so
+
+        a segment id of a RECURRING tile returns its derived view.'
+      operationId: read_tile
+      parameters:
+      - name: id
+        in: path
+        description: Tile id (or lazy segment identity)
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Tile view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TileViewSchema'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found / not visible
+    delete:
+      tags:
+      - Commands
+      summary: 'Archive a Tile (`ARCHIVE_TILE` command).  Tiles with finished
+
+        executions cannot be archived: the command fails 422 (blocked,
+
+        `violations[0].kind` = PAST_EXECUTION_FINISHED=9 / ANCHOR_IMMUTABLE
+
+        =10) and the tile remains.  Tiles without execution history are
+
+        archived and disappear from listings.'
+      operationId: archive_tile
+      parameters:
+      - name: id
+        in: path
+        description: Tile id; must equal payload.tile_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<ArchiveTilePayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArchiveTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: Stale revision or reused idempotency key
+        '422':
+          description: 'Blocked: tile has finished executions or an immutable anchor'
+      x-tastile-required-scope: tastile.write
+    patch:
+      tags:
+      - Commands
+      summary: 'Edit Tile meta-min fields (tags / notes / project_id).  Requires
+
+        the `If-Match` etag header (428 when absent; 409 `etag_mismatch`
+
+        with `current_etag` when stale).'
+      operationId: patch_tile_meta
+      parameters:
+      - name: id
+        in: path
+        description: Tile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: If-Match
+        in: header
+        description: Current tile ETag (optimistic concurrency)
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: PatchTileBody
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Updated tile revision and new ETag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchTileResponseSchema'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: ETag mismatch (body carries current_etag)
+        '428':
+          description: If-Match header required
+      x-tastile-required-scope: tastile.write
+  /v1/tiles/{id}/complete:
+    post:
+      tags:
+      - Commands
+      summary: 'Tile lifecycle transition.  `state`: 0 active / 1 deferred /
+
+        2 completed; `deferred_until` / `completed_at` bound the
+
+        transition, `bump_extend` drives the extend-phase flow.  The same
+
+        payload serves `/complete`, `/defer`, and `/extend-phase`.'
+      operationId: complete_tile
+      parameters:
+      - name: id
+        in: path
+        description: Tile id; must equal payload.tile_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<SetTileLifecyclePayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetTileLifecycleRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
+  /v1/tiles/{id}/defer:
+    post:
+      tags:
+      - Commands
+      summary: 'Tile lifecycle transition — deferred variant of
+
+        `SetTileLifecyclePayload` (typically `state = 1` with
+
+        `deferred_until`).'
+      operationId: defer_tile
+      parameters:
+      - name: id
+        in: path
+        description: Tile id; must equal payload.tile_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<SetTileLifecyclePayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetTileLifecycleRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
+  /v1/tiles/{id}/detail:
+    get:
+      tags:
+      - Read
+      summary: 'Tile detail: base view + annotation labels + recurrence model for
+
+        RECURRING tiles (`domain::read::TileDetailView`).'
+      operationId: read_tile_detail
+      parameters:
+      - name: id
+        in: path
+        description: Tile id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Tile detail view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TileDetailViewSchema'
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found / not visible
+  /v1/tiles/{id}/extend-phase:
+    post:
+      tags:
+      - Commands
+      summary: 'Tile lifecycle transition — extend-phase variant
+
+        (`bump_extend = true`).'
+      operationId: extend_phase_tile
+      parameters:
+      - name: id
+        in: path
+        description: Tile id; must equal payload.tile_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<SetTileLifecyclePayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetTileLifecycleRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
+  /v1/tiles/{id}/memos:
+    post:
+      tags:
+      - Commands
+      summary: Attach a memo to a Tile (`ATTACH_MEMO` command).
+      operationId: attach_memo
+      parameters:
+      - name: id
+        in: path
+        description: Tile id; must equal payload.tile_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<AttachMemoPayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachMemoRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
+  /v1/tiles/{id}/plan:
+    post:
+      tags:
+      - Commands
+      summary: Set or replace a Tile's Plan (`SET_PLAN` command).
+      operationId: set_plan
+      parameters:
+      - name: id
+        in: path
+        description: Tile id; must equal payload.tile_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: OwnerCommandRequest<SetPlanPayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPlanRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
+  /v1/tiles/{id}/start:
+    post:
+      tags:
+      - Commands
+      summary: 'Start a Tile: attach a Plan and create the first Placement /
+
+        Execution linkage (`START_TILE` command).'
+      operationId: start_tile
+      parameters:
+      - name: id
+        in: path
+        description: Tile id; must equal payload.tile_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<StartTilePayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
+  /v1/tiles/{id}/update:
+    post:
+      tags:
+      - Commands
+      summary: 'Update Tile fields (`UPDATE_TILE` command).  Prefer
+
+        `PATCH /v1/tiles/{id}` for meta-min fields; this command covers
+
+        title/description/color/icon/external_id with revision checks.'
+      operationId: update_tile
+      parameters:
+      - name: id
+        in: path
+        description: Tile id; must equal payload.tile_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: CommandRequest<UpdateTilePayload>
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTileRequest'
+        required: true
+      responses:
+        '200':
+          description: Command response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Validation error (incl. path/payload id mismatch)
+        '401':
+          description: Missing or invalid auth
+        '404':
+          description: Tile not found
+        '409':
+          description: Stale revision or reused idempotency key
+      x-tastile-required-scope: tastile.write
   /v1/timeline:
     get:
       tags:
@@ -2451,6 +3133,23 @@ components:
           $ref: '#/components/schemas/PickSchema'
         when:
           $ref: '#/components/schemas/ConditionRefSchema'
+    AnnotationLabelViewSchema:
+      type: object
+      description: '`domain::read::AnnotationLabelView`.'
+      required:
+      - id
+      - kind
+      - label
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+          description: Numeric `AnnotationKind` registry value.
+        label:
+          type: string
     ApiErrorSchema:
       type: object
       description: 'Mirror of `domain::command::ApiError` — the standard error envelope
@@ -2609,6 +3308,150 @@ components:
           format: date-time
         scopes:
           type: string
+    AppendChangesPayloadSchema:
+      type: object
+      description: '`payload` of `APPEND_CHANGES` (`domain::command::AppendChangesPayload`).'
+      required:
+      - placement_id
+      - changeset
+      properties:
+        changeset:
+          $ref: '#/components/schemas/ChangeSetWriteSchema'
+        companions:
+          type: array
+          items: {}
+          description: 'Companion placement proposals emitted by the same change set;
+
+            v1/14 proposal definitions transported as JSON.'
+        placement_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+        source_flow_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Persisted Flow definition that produced companion proposals.
+    AppendChangesRequest:
+      type: object
+      description: '`POST /v1/placements/{id}/changes` body:
+
+        `OwnerCommandRequest<AppendChangesPayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'Client-declared observed time (v1/14 §1-1 `observedAt`, core#560).
+
+            `occurred_at` is the deprecated wire alias; the server ignores it.'
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Optional WORKSPACE owner override; must be owned by the actor.
+        payload:
+          $ref: '#/components/schemas/AppendChangesPayloadSchema'
+    ArchiveTilePayloadSchema:
+      type: object
+      description: '`domain::command::ArchiveTilePayload`.'
+      required:
+      - tile_id
+      properties:
+        tile_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+    ArchiveTileRequest:
+      type: object
+      description: '`DELETE /v1/tiles/{id}` body:
+
+        `CommandRequest<ArchiveTilePayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/ArchiveTilePayloadSchema'
+    AttachMemoPayloadSchema:
+      type: object
+      description: '`domain::command::AttachMemoPayload`.'
+      required:
+      - tile_id
+      - body
+      properties:
+        body:
+          type: string
+        tile_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+    AttachMemoRequest:
+      type: object
+      description: '`POST /v1/tiles/{id}/memos` body:
+
+        `CommandRequest<AttachMemoPayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/AttachMemoPayloadSchema'
     CalendarTermSchema:
       type: object
       required:
@@ -2810,6 +3653,142 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ChangeValueSchema'
+    ChangeSetActivationSchema:
+      type: object
+      description: '`domain::change_set::Activation` — `when` is a v1/04 Condition
+        AST and
+
+        `until` a v1/04 Moment; both are transported as JSON.'
+      properties:
+        until: {}
+        when: {}
+    ChangeSetRevokedSchema:
+      type: object
+      description: '`domain::change_set::Revoked`.'
+      required:
+      - at
+      - by
+      properties:
+        at:
+          type: string
+          format: date-time
+        by:
+          type: string
+          format: uuid
+        reason:
+          type:
+          - string
+          - 'null'
+    ChangeSetViewSchema:
+      type: object
+      description: '`domain::read::ChangeSetView` — `GET /v1/change-sets/{id}` body.'
+      required:
+      - id
+      - owner_id
+      - target_kind
+      - target_id
+      - layer
+      - rank
+      - source
+      - created_at
+      - change_count
+      properties:
+        change_count:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        layer:
+          type: integer
+          format: int32
+          description: Numeric `ChangeLayer` registry value.
+        owner_id:
+          type: string
+          format: uuid
+        rank:
+          type: integer
+          format: int64
+        source:
+          type: integer
+          format: int32
+          description: Numeric `ChangeSource` registry value.
+        target_id:
+          type: string
+          format: uuid
+        target_kind:
+          type: integer
+          format: int32
+          description: Numeric target kind registry value.
+    ChangeSetWriteSchema:
+      type: object
+      description: '`domain::change_set::ChangeSet` — the client-built change set
+        inside
+
+        `APPEND_CHANGES`.  NOTE (core#587): the server accepts (`200`) changes
+
+        it cannot map onto a span endpoint or resolution rule — acceptance is
+
+        NOT proof of application.  Always read back via
+
+        `GET /v1/placements/{id}` / `/v1/timeline` after appending.'
+      required:
+      - id
+      - owner_id
+      - target
+      - layer
+      - rank
+      - changes
+      - activation
+      - source
+      - created_at
+      - created_by
+      properties:
+        activation:
+          $ref: '#/components/schemas/ChangeSetActivationSchema'
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChangeWriteSchema'
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          $ref: '#/components/schemas/StampSchema'
+          description: '`domain::common::Stamp`.'
+        id:
+          type: string
+          format: uuid
+        layer:
+          type: integer
+          format: int32
+          description: 'Numeric `ChangeLayer` registry value (0 RECURRING / 1 PLACEMENT
+            /
+
+            2 EXECUTION / 3 SOURCE).'
+        owner_id:
+          type: string
+          format: uuid
+        rank:
+          type: integer
+          format: int32
+        revoked:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ChangeSetRevokedSchema'
+        source:
+          type: integer
+          format: int32
+          description: Numeric `ChangeSource` registry value.
+        source_ref:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ChangeSourceRefSchema'
+        target:
+          $ref: '#/components/schemas/ChangeTargetWriteSchema'
     ChangeSourceRefSchema:
       type: object
       properties:
@@ -2843,6 +3822,25 @@ components:
           - string
           - 'null'
           format: uuid
+    ChangeTargetWriteSchema:
+      oneOf:
+      - type: object
+        required:
+        - Placement
+        properties:
+          Placement:
+            type: string
+            format: uuid
+      - type: object
+        required:
+        - Execution
+        properties:
+          Execution:
+            type: string
+            format: uuid
+      description: '`domain::change_set::ChangeTarget` — externally tagged:
+
+        `{"Placement": "<uuid>"}` or `{"Execution": "<uuid>"}`.'
     ChangeValueSchema:
       oneOf:
       - type: object
@@ -2919,6 +3917,48 @@ components:
       - type: string
         enum:
         - None
+    ChangeWriteSchema:
+      type: object
+      description: '`domain::change_set::Change` — one entry of `ChangeSet.changes`.'
+      required:
+      - id
+      - key
+      - kind
+      - merge
+      - source
+      - rank
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          $ref: '#/components/schemas/ChangeKeySchema'
+        kind:
+          type: integer
+          format: int32
+          description: 'Numeric `ChangeKind` registry value (0 SET / 1 CLEAR / 2 PUT
+            /
+
+            3 DROP).'
+        merge:
+          type: integer
+          format: int32
+          description: Numeric `MergeMode` registry value.
+        rank:
+          type: integer
+          format: int32
+        source:
+          type: integer
+          format: int32
+          description: Numeric `ChangeSource` registry value.
+        source_ref:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ChangeSourceRefSchema'
+        value:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ChangeValueSchema'
     ChooseBranchSchema:
       type: object
       required:
@@ -2942,6 +3982,45 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ScalarExpressionRefSchema'
+    ClosePlacementPayloadSchema:
+      type: object
+      description: '`domain::command::ClosePlacementPayload`.'
+      required:
+      - placement_id
+      properties:
+        placement_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+    ClosePlacementRequest:
+      type: object
+      description: '`POST /v1/placements/{id}/close` body:
+
+        `CommandRequest<ClosePlacementPayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/ClosePlacementPayloadSchema'
     CommandResponse:
       type: object
       required:
@@ -3476,6 +4555,45 @@ components:
           type:
           - string
           - 'null'
+    DetachPlacementPayloadSchema:
+      type: object
+      description: '`domain::command::DetachPlacementPayload`.'
+      required:
+      - placement_id
+      properties:
+        placement_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+    DetachPlacementRequest:
+      type: object
+      description: '`POST /v1/placements/{id}/detach` body:
+
+        `CommandRequest<DetachPlacementPayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/DetachPlacementPayloadSchema'
     EmptyPayloadSchema:
       type: object
       description: Placeholder for a command whose payload carries no fields.
@@ -3595,6 +4713,62 @@ components:
           format: date-time
         payload:
           $ref: '#/components/schemas/EnqueueDeliveryPayloadSchema'
+    ExecutionBasisSchema:
+      type: object
+      description: '`GET /v1/executions/{id}/basis` body — the captured resolution
+        basis
+
+        recorded when the execution started (v1/14 §2.5).'
+      required:
+      - execution_id
+      - placement_id
+      - placement_revision
+      properties:
+        captured_actor_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        captured_actor_kind:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: Numeric `ActorKind` registry value.
+        captured_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        captured_command_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        effective_placement_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        effective_resolution_hash:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        execution_id:
+          type: string
+          format: uuid
+        placement_id:
+          type: string
+          format: uuid
+        placement_revision:
+          type: integer
+          format: int64
+        resolution_hash:
+          type:
+          - string
+          - 'null'
+          format: uuid
     ExecutionLifecycleRequest:
       type: object
       description: '`PAUSE_EXECUTION` / `RESUME_EXECUTION` take no payload of their
@@ -3632,6 +4806,116 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/EmptyPayloadSchema'
             description: Always `null`.
+    ExecutionViewSchema:
+      type: object
+      description: '`domain::read::ExecutionView` — `GET /v1/executions/{id}` body.'
+      required:
+      - id
+      - tile_id
+      - owner_id
+      - revision
+      - state
+      - segment_count
+      - fact_count
+      - task_run_count
+      - created_at
+      - updated_at
+      properties:
+        basis_resolution_hash:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        captured_actor_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        captured_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        effective_placement_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        effective_resolution_hash:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        fact_count:
+          type: integer
+          format: int64
+        finish_kind:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: Numeric `ExecutionFinishKind` registry value when finished.
+        finish_note:
+          type:
+          - string
+          - 'null'
+        finished_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        open_segment_kind:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: Numeric `ExecutionSegmentKind` registry value of the open segment.
+        open_segment_start:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type: string
+          format: uuid
+        placement_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        placement_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        revision:
+          type: integer
+          format: int64
+        segment_count:
+          type: integer
+          format: int64
+        state:
+          type: integer
+          format: int32
+          description: 'Numeric `ExecutionState` registry value (0 ACTIVE / 1 PAUSED
+            /
+
+            2 FINISHED_NORMAL / 3 FINISHED_VOID).'
+        task_run_count:
+          type: integer
+          format: int64
+        tile_id:
+          type: string
+          format: uuid
+        updated_at:
+          type: string
+          format: date-time
     FactComparisonSchema:
       oneOf:
       - type: object
@@ -3849,6 +5133,36 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/RangeI64Schema'
+    GeneratorViewSchema:
+      oneOf:
+      - type: object
+        required:
+        - step_min
+        - kind
+        properties:
+          anchor_epoch_min:
+            type:
+            - integer
+            - 'null'
+            format: int64
+          kind:
+            type: string
+            enum:
+            - time_based
+          step_min:
+            type: integer
+            format: int32
+      - type: object
+        required:
+        - kind
+        properties:
+          kind:
+            type: string
+            enum:
+            - focus_block_based
+      description: '`domain::read::GeneratorView` — internally tagged on `kind`
+
+        (`time_based` / `focus_block_based`).'
     InsideSchema:
       type: object
       required:
@@ -4406,6 +5720,47 @@ components:
           - integer
           - 'null'
           format: int64
+    PatchTileRequest:
+      type: object
+      description: '`PATCH /v1/tiles/{id}` body (`handlers::tile_edit::PatchTileBody`).
+
+        Meta-min edit; requires the `If-Match` etag header.'
+      properties:
+        notes:
+          type:
+          - string
+          - 'null'
+        project_id:
+          type:
+          - string
+          - 'null'
+          description: 'Three-state project override: absent = unchanged, `null` =
+            unset,
+
+            string = project UUID.'
+        tags:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+    PatchTileResponseSchema:
+      type: object
+      description: '`PATCH /v1/tiles/{id}` response body.'
+      required:
+      - id
+      - revision
+      - etag
+      properties:
+        etag:
+          type: string
+          description: New ETag for the next `If-Match`.
+        id:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          format: int64
     PendingWorkSchema:
       type: object
       required:
@@ -4556,6 +5911,111 @@ components:
         tile_id:
           type: string
           format: uuid
+    PlacementReadSchema:
+      type: object
+      description: '`handlers::read::PlacementRead` — `GET /v1/placements/{id}` body.
+
+        `PlacementView` is `#[serde(flatten)]`ed, so the placement fields
+
+        appear at the top level alongside the occurrence linkage fields.'
+      required:
+      - id
+      - tile_id
+      - plan_id
+      - owner_id
+      - source_kind
+      - revision
+      - span_start
+      - span_end
+      - inside_scope_kind
+      - detach
+      - close
+      - created_at
+      - updated_at
+      properties:
+        close:
+          type: boolean
+          description: 'True when the placement is terminally closed (single-occurrence
+
+            cancel, core#428); closed occurrences keep `closed=true`.'
+        closed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        detach:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        inside_parent:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        inside_scope_kind:
+          type: integer
+          format: int32
+          description: Numeric `ScopeKind` registry value (0 ROOT / 1 HOST / 2 GAP).
+        occurrence_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        plan_id:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          format: int64
+        source_kind:
+          type: integer
+          format: int32
+          description: 'Numeric `PlacementSource` registry value (0 MANUAL / 1 RECURRING
+            /
+
+            2 FLOW / 3 IMPORT / 4 SOURCE).'
+        source_tile_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'SourceTile this placement was materialized from, when
+
+            source-managed.'
+        span_end:
+          type: string
+          format: date-time
+        span_start:
+          type: string
+          format: date-time
+        split_count:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        split_group_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        split_index:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        tile_id:
+          type: string
+          format: uuid
+        updated_at:
+          type: string
+          format: date-time
     PlacementRuleEffectSchema:
       type: object
       required:
@@ -4959,6 +6419,23 @@ components:
         window_start_min:
           type: integer
           format: int32
+    RecurringExclusionViewSchema:
+      type: object
+      description: '`domain::read::ExclusionView`.'
+      required:
+      - id
+      - start_offset_min
+      - end_offset_min
+      properties:
+        end_offset_min:
+          type: integer
+          format: int32
+        id:
+          type: string
+          format: uuid
+        start_offset_min:
+          type: integer
+          format: int32
     RecurringInstanceListResponse:
       type: object
       description: 'Mirror of `handlers::paging::ListResponse<RecurringInstance>`
@@ -5007,6 +6484,56 @@ components:
         source_revision:
           type: integer
           format: int64
+    RecurringModelViewSchema:
+      type: object
+      description: '`domain::read::RecurringModelView`.'
+      required:
+      - generator
+      - window
+      - exclusions
+      properties:
+        exclusions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringExclusionViewSchema'
+        generator:
+          $ref: '#/components/schemas/GeneratorViewSchema'
+        selector:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/RecurringSelectorViewSchema'
+        window:
+          $ref: '#/components/schemas/RecurringWindowViewSchema'
+    RecurringSelectorViewSchema:
+      type: object
+      description: '`domain::read::SelectorView`.'
+      required:
+      - kind
+      - value
+      properties:
+        kind:
+          type: integer
+          format: int32
+          description: Numeric `RecurrenceSelectorKind` registry value.
+        value:
+          type: string
+    RecurringWindowViewSchema:
+      type: object
+      description: '`domain::read::WindowView`.'
+      required:
+      - weekday_mask
+      - start_offset_min
+      - end_offset_min
+      properties:
+        end_offset_min:
+          type: integer
+          format: int32
+        start_offset_min:
+          type: integer
+          format: int32
+        weekday_mask:
+          type: integer
+          format: int32
     ReferenceDefSchema:
       type: object
       required:
@@ -5766,6 +7293,144 @@ components:
           type:
           - string
           - 'null'
+    SetPlanPayloadSchema:
+      type: object
+      description: '`domain::command::SetPlanPayload`.  `references` / `completion`
+        /
+
+        `planning` / `metrics` / `decisions` carry the v1/06 plan definition
+
+        structures; their full nested shape is owned by v1/06 and is
+
+        transported as JSON (same convention as `CreateSessionPayloadSchema`).'
+      required:
+      - tile_id
+      - role
+      - references
+      - completion
+      - planning
+      - metrics
+      - decisions
+      properties:
+        completion: {}
+        decisions:
+          type: array
+          items: {}
+        metrics:
+          type: array
+          items: {}
+        planning: {}
+        references:
+          type: array
+          items: {}
+        role:
+          type: integer
+          format: int32
+          description: Numeric `PlanRole` registry value (0 EXECUTABLE / 1 LABEL).
+        tile_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+    SetPlanRequest:
+      type: object
+      description: '`POST /v1/tiles/{id}/plan` body:
+
+        `OwnerCommandRequest<SetPlanPayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        owner_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Optional WORKSPACE owner override; must be owned by the actor.
+        payload:
+          $ref: '#/components/schemas/SetPlanPayloadSchema'
+    SetTileLifecyclePayloadSchema:
+      type: object
+      description: '`domain::command::SetTileLifecyclePayload`.  The same payload
+        serves
+
+        `POST /v1/tiles/{id}/complete`, `/defer`, and `/extend-phase`; the
+
+        endpoint path does not change semantics — `state` /
+
+        `bump_extend` do (0 active / 1 deferred / 2 completed).'
+      required:
+      - tile_id
+      - state
+      - bump_extend
+      properties:
+        bump_extend:
+          type: boolean
+          description: When true, bump extended_count for the extend-phase flow.
+        completed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        deferred_until:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        state:
+          type: integer
+          format: int32
+          description: 0 = active, 1 = deferred, 2 = completed.
+        tile_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+    SetTileLifecycleRequest:
+      type: object
+      description: 'Shared body for `POST /v1/tiles/{id}/complete`, `/defer`, and
+
+        `/extend-phase`: `CommandRequest<SetTileLifecyclePayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/SetTileLifecyclePayloadSchema'
     SourceGenerationSchema:
       type: object
       required:
@@ -6375,6 +8040,61 @@ components:
           description: Optional WORKSPACE owner override; must be owned by the actor.
         payload:
           $ref: '#/components/schemas/StartExecutionPayloadSchema'
+    StartTilePayloadSchema:
+      type: object
+      description: '`domain::command::StartTilePayload`.'
+      required:
+      - tile_id
+      - plan_id
+      - source
+      - source_ref
+      - baseline
+      properties:
+        baseline:
+          $ref: '#/components/schemas/PlacementBaselineSchema'
+        plan_id:
+          type: string
+          format: uuid
+          description: Plan to attach on start.  Required.
+        source:
+          type: integer
+          format: int32
+          description: Numeric `PlacementSource` registry value.
+        source_ref:
+          $ref: '#/components/schemas/PlacementSourceRefSchema'
+        tile_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+    StartTileRequest:
+      type: object
+      description: '`POST /v1/tiles/{id}/start` body:
+
+        `CommandRequest<StartTilePayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/StartTilePayloadSchema'
     StartupRecoveryPayloadSchema:
       type: object
       description: '`POST /v1/prompts/startup-recovery` names the prompt in the body
@@ -6714,6 +8434,28 @@ components:
         properties:
           Life:
             $ref: '#/components/schemas/LifeTermSchema'
+    TileDetailViewSchema:
+      type: object
+      description: '`domain::read::TileDetailView` — `GET /v1/tiles/{id}/detail` body.'
+      required:
+      - base
+      - labels
+      - resolved_at
+      properties:
+        base:
+          $ref: '#/components/schemas/TileViewSchema'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnnotationLabelViewSchema'
+        recurring:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/RecurringModelViewSchema'
+            description: Populated only for RECURRING tiles.
+        resolved_at:
+          type: string
+          format: date-time
     TileListResponse:
       type: object
       description: 'Mirror of `handlers::paging::ListResponse<TileListView>` for
@@ -6838,6 +8580,68 @@ components:
           type: array
           items:
             type: string
+    TileViewSchema:
+      type: object
+      description: '`domain::read::TileView` — `GET /v1/tiles/{id}` response body.'
+      required:
+      - id
+      - kind
+      - owner_id
+      - revision
+      - title
+      - created_at
+      - updated_at
+      properties:
+        archived_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        color:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+        description:
+          type:
+          - string
+          - 'null'
+        external_id:
+          type:
+          - string
+          - 'null'
+        icon:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: integer
+          format: int32
+          description: 'Numeric `TileKind` registry value (0 RECURRING / 1 PLACEMENT
+            /
+
+            2 EXECUTION / 3 SOURCE).'
+        owner_id:
+          type: string
+          format: uuid
+        plan_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        revision:
+          type: integer
+          format: int64
+        title:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
     TimeObservationSchema:
       type: object
       required:
@@ -7267,6 +9071,67 @@ components:
           format: date-time
         payload:
           $ref: '#/components/schemas/UpdateSourceTilePayloadSchema'
+    UpdateTilePayloadSchema:
+      type: object
+      description: '`domain::command::UpdateTilePayload` — three-state optional fields:
+
+        absent = unchanged, explicit `null` = clear, value = set.'
+      required:
+      - tile_id
+      properties:
+        color:
+          type:
+          - string
+          - 'null'
+        description:
+          type:
+          - string
+          - 'null'
+        external_id:
+          type:
+          - string
+          - 'null'
+        icon:
+          type:
+          - string
+          - 'null'
+        tile_id:
+          type: string
+          format: uuid
+          description: Must equal the `{id}` path parameter.
+        title:
+          type:
+          - string
+          - 'null'
+    UpdateTileRequest:
+      type: object
+      description: '`POST /v1/tiles/{id}/update` body:
+
+        `CommandRequest<UpdateTilePayload>`.'
+      required:
+      - idempotency_key
+      - payload
+      properties:
+        expected_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        idempotency_key:
+          type: string
+          format: uuid
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        occurred_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/UpdateTilePayloadSchema'
   securitySchemes:
     apiTokenCookie:
       type: apiKey
